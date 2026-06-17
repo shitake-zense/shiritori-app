@@ -1,6 +1,7 @@
 // DOM制御とゲーム進行
 import { judge, lastChar } from "./game.js";
 import { randomStarter } from "./dictionary.js";
+import { loadHistory, saveGame, clearHistory } from "./history.js";
 
 const el = {
   currentWord: document.getElementById("currentWord"),
@@ -9,6 +10,9 @@ const el = {
   form: document.getElementById("wordForm"),
   message: document.getElementById("message"),
   resetBtn: document.getElementById("resetBtn"),
+  chain: document.getElementById("chain"),
+  historyList: document.getElementById("historyList"),
+  clearHistoryBtn: document.getElementById("clearHistoryBtn"),
 };
 
 let state;
@@ -27,6 +31,34 @@ function render() {
   el.currentWord.textContent = prev;
   el.nextChar.textContent = lastChar(prev);
   el.input.disabled = state.over;
+  renderChain();
+}
+
+function renderChain() {
+  el.chain.innerHTML = "";
+  state.words.forEach((w) => {
+    const li = document.createElement("li");
+    li.className = "chain__item";
+    li.textContent = w;
+    el.chain.appendChild(li);
+  });
+}
+
+function renderHistory() {
+  const list = loadHistory();
+  el.historyList.innerHTML = "";
+  if (list.length === 0) {
+    el.historyList.innerHTML = '<li class="history__empty">まだ記録はありません</li>';
+    return;
+  }
+  list.forEach((g) => {
+    const li = document.createElement("li");
+    li.className = "history__item";
+    li.innerHTML =
+      `<span class="history__meta">${g.date}・${g.length}語</span>` +
+      `<span class="history__words">${g.words.join(" → ")}</span>`;
+    el.historyList.appendChild(li);
+  });
 }
 
 function setMessage(text, type = "") {
@@ -54,8 +86,7 @@ el.form.addEventListener("submit", (e) => {
     if (result.end === "lose") {
       state.words.push(word);
       state.used.add(word);
-      state.over = true;
-      render();
+      endGame("lose");
     }
     setMessage(result.reason, result.end ? "lose" : "error");
     return;
@@ -66,7 +97,7 @@ el.form.addEventListener("submit", (e) => {
   el.input.value = "";
 
   if (result.end) {
-    state.over = true;
+    endGame(result.end);
     setMessage(result.reason, result.end);
   } else {
     setMessage("OK！次どうぞ", "ok");
@@ -75,6 +106,18 @@ el.form.addEventListener("submit", (e) => {
   el.input.focus();
 });
 
-el.resetBtn.addEventListener("click", start);
+function endGame(result) {
+  state.over = true;
+  saveGame(state.words, result);
+  render();
+  renderHistory();
+}
 
+el.resetBtn.addEventListener("click", start);
+el.clearHistoryBtn.addEventListener("click", () => {
+  clearHistory();
+  renderHistory();
+});
+
+renderHistory();
 start();

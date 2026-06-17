@@ -32,9 +32,19 @@
 
     <p class="message" id="message" role="status"></p>
 
+    <ol class="chain" id="chain" aria-label="この対戦の単語履歴"></ol>
+
     <div class="actions">
       <button class="btn btn--ghost" id="resetBtn" type="button">リセット</button>
     </div>
+
+    <section class="history">
+      <div class="history__head">
+        <h2 class="history__title">これまでの記録</h2>
+        <button class="btn btn--text" id="clearHistoryBtn" type="button">クリア</button>
+      </div>
+      <ul class="history__list" id="historyList"></ul>
+    </section>
   </main>
 
   <script type="module" src="./js/main.js"></script>
