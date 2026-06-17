@@ -27,7 +27,10 @@ https://shitake-zense.github.io/shiritori-app/
   - [x] 独自縛りルール: 文字数しばり（N文字以上／なし・3・4・5）。judgeにopts.minLength注入
   - [x] README完成（課題提出用・概要/遊び方/機能/構成/実行手順）
   - [x] UI磨き: 和モダン（墨×朱×和紙）へ全面リデザイン。明朝×ゴシック、判子モチーフ、グレイン、勝敗/入力アニメ（prefers-reduced-motion対応）
-- [ ] **M5 複数人対戦**（後半・Firebase要相談）← 次はここ
+- [ ] **M5 複数人対戦**（Firebase Realtime Database・ルームコード方式）← 進行中
+  - [x] Round A: ロジック層 `js/online.js`（createRoom/joinRoom/subscribeRoom/submitWord/rematch/leaveRoom）。判定はjudge()をtransaction内で権威評価。`js/firebase-config.js`テンプレ・`docs/FIREBASE.md`手順書
+  - [ ] **あなたの作業**: Firebaseプロジェクト作成→firebase-config.js設定→DBルール反映（docs/FIREBASE.md）
+  - [ ] Round B: UI統合（ひとり/ふたり対戦モード切替・ルーム画面・手番/相手表示）← 次はここ
 
 ## 設計メモ
 - ロジック(game.js)とDOM(main.js)を分離。judge()の戻り値 `{ok, reason?, end?}` が状態遷移の中心

@@ -1,0 +1,190 @@
+// オンライン対戦のロジック層（DOM非依存）。
+// Firebase Realtime Database でルーム状態を同期する。ルームコード方式。
+//
+// ルームのデータ構造（rooms/{code}）:
+//   status   : "waiting" | "playing" | "over"
+//   rule     : { dictCheck: bool, minLength: number }
+//   starter  : string          初期単語
+//   words    : string[]        つないだ単語列（words[0] が starter）
+//   turn     : 0 | 1           次に打つ席(seat)
+//   loser    : 0 | 1 | null    敗者の席
+//   players  : { [playerId]: { name, seat: 0|1, online: bool } }
+//
+// 勝敗・接続判定は game.js の judge() を権威として transaction 内で再評価する。
+
+import {
+  initializeApp,
+} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
+import {
+  getDatabase, ref, get, set, update, onValue,
+  runTransaction, onDisconnect, serverTimestamp,
+} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-database.js";
+
+import { firebaseConfig, isConfigured } from "./firebase-config.js";
+import { judge } from "./game.js";
+import { randomStarter, isRealWord } from "./dictionary.js";
+
+let db = null;
+
+/** Firebaseを初期化（未設定なら例外）。複数回呼んでも安全。 */
+export function initOnline() {
+  if (db) return db;
+  if (!isConfigured()) {
+    throw new Error("firebase-config.js が未設定です（docs/FIREBASE.md 参照）");
+  }
+  const app = initializeApp(firebaseConfig);
+  db = getDatabase(app);
+  return db;
+}
+
+// 紛らわしい文字(I/O/0/1)を除いたルームコード用文字種
+const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+function makeCode(len = 4) {
+  let s = "";
+  for (let i = 0; i < len; i++) {
+    s += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)];
+  }
+  return s;
+}
+
+/** 切断時に online=false になるよう presence を設定 */
+function setupPresence(code, playerId) {
+  const onlineRef = ref(db, `rooms/${code}/players/${playerId}/online`);
+  set(onlineRef, true);
+  onDisconnect(onlineRef).set(false);
+}
+
+/**
+ * ルームを作成しホスト(seat 0)として参加する。
+ * @returns {Promise<{code:string, playerId:string, seat:0}>}
+ */
+export async function createRoom({ name, rule } = {}) {
+  initOnline();
+  const playerId = crypto.randomUUID();
+  const starter = randomStarter();
+  const safeRule = {
+    dictCheck: !!(rule && rule.dictCheck),
+    minLength: (rule && rule.minLength) || 2,
+  };
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const code = makeCode();
+    const roomRef = ref(db, `rooms/${code}`);
+    const snap = await get(roomRef);
+    if (snap.exists()) continue; // コード衝突 → リトライ
+    await set(roomRef, {
+      status: "waiting",
+      createdAt: serverTimestamp(),
+      rule: safeRule,
+      starter,
+      words: [starter],
+      turn: 0,
+      loser: null,
+      players: { [playerId]: { name: name || "ホスト", seat: 0, online: true } },
+    });
+    setupPresence(code, playerId);
+    return { code, playerId, seat: 0 };
+  }
+  throw new Error("ルーム作成に失敗しました（コードの空きが見つかりません）");
+}
+
+/**
+ * 既存ルームにゲスト(seat 1)として参加する。
+ * @returns {Promise<{code:string, playerId:string, seat:1}>}
+ */
+export async function joinRoom({ code, name } = {}) {
+  initOnline();
+  code = (code || "").trim().toUpperCase();
+  if (!code) throw new Error("ルームコードを入力してください");
+
+  const roomRef = ref(db, `rooms/${code}`);
+  const snap = await get(roomRef);
+  if (!snap.exists()) throw new Error("そのルームは存在しません");
+
+  const room = snap.val();
+  const players = room.players || {};
+  if (Object.keys(players).length >= 2) throw new Error("ルームは満員です");
+
+  const playerId = crypto.randomUUID();
+  await update(ref(db, `rooms/${code}/players/${playerId}`), {
+    name: name || "ゲスト", seat: 1, online: true,
+  });
+  await update(roomRef, { status: "playing" });
+  setupPresence(code, playerId);
+  return { code, playerId, seat: 1 };
+}
+
+/**
+ * ルーム状態を購読する。
+ * @param {(room:object|null)=>void} cb
+ * @returns {() => void} 購読解除関数
+ */
+export function subscribeRoom(code, cb) {
+  initOnline();
+  return onValue(ref(db, `rooms/${code}`), (snap) => cb(snap.val()));
+}
+
+/**
+ * 自分の手番として単語を送信する。判定は transaction 内で権威評価。
+ * ルール(opts)は room.rule から構築するため、両者が同じルールで判定される。
+ * @returns {Promise<{ok:boolean, reason?:string, end?:"win"|"lose"}>}
+ */
+export async function submitWord({ code, seat }, word) {
+  initOnline();
+  const roomRef = ref(db, `rooms/${code}`);
+  let outcome = { ok: false, reason: "送信に失敗しました" };
+
+  await runTransaction(roomRef, (room) => {
+    if (!room || room.status !== "playing") {
+      outcome = { ok: false, reason: "対戦中ではありません" };
+      return room;
+    }
+    if (room.turn !== seat) {
+      outcome = { ok: false, reason: "いまは相手の番です" };
+      return room; // 変更なし
+    }
+    const words = room.words || [];
+    const prev = words[words.length - 1];
+    const used = new Set(words);
+
+    const opts = {};
+    if (room.rule && room.rule.dictCheck) opts.isRealWord = isRealWord;
+    if (room.rule && room.rule.minLength > 2) opts.minLength = room.rule.minLength;
+
+    const res = judge(word, prev, used, opts);
+    outcome = res;
+
+    if (!res.ok && !res.end) {
+      return undefined; // 無効入力 → abort（状態を変えない）
+    }
+    words.push(word);
+    room.words = words;
+    if (res.end === "lose") {
+      room.status = "over";
+      room.loser = seat;
+    } else {
+      room.turn = 1 - seat;
+    }
+    return room;
+  });
+  return outcome;
+}
+
+/** 同じルームで再戦（状態を初期化） */
+export async function rematch(code) {
+  initOnline();
+  const starter = randomStarter();
+  await update(ref(db, `rooms/${code}`), {
+    status: "playing", words: [starter], starter, turn: 0, loser: null,
+  });
+}
+
+/** ルームから退出（presence を落とす） */
+export async function leaveRoom({ code, playerId }) {
+  if (!db) return;
+  try {
+    await set(ref(db, `rooms/${code}/players/${playerId}/online`), false);
+  } catch (e) {
+    console.warn("退出処理に失敗:", e);
+  }
+}
