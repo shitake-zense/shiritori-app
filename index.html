@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>しりとり</title>
+  <link rel="stylesheet" href="./css/style.css" />
+</head>
+<body>
+  <main class="app">
+    <header class="app__header">
+      <h1 class="app__title">しりとり</h1>
+      <p class="app__subtitle">前の単語の最後の文字から続けてね</p>
+    </header>
+
+    <section class="board" aria-live="polite">
+      <p class="board__label">前の単語</p>
+      <p class="board__word" id="currentWord">―</p>
+      <p class="board__next">次は「<span id="nextChar">―</span>」から</p>
+    </section>
+
+    <form class="input" id="wordForm" autocomplete="off">
+      <input
+        class="input__field"
+        id="wordInput"
+        type="text"
+        placeholder="ひらがなで入力"
+        aria-label="単語を入力"
+      />
+      <button class="input__submit" type="submit">送信</button>
+    </form>
+
+    <p class="message" id="message" role="status"></p>
+
+    <div class="actions">
+      <button class="btn btn--ghost" id="resetBtn" type="button">リセット</button>
+    </div>
+  </main>
+
+  <script type="module" src="./js/main.js"></script>
+</body>
+</html>
