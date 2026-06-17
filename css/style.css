@@ -44,6 +44,9 @@ body {
   cursor: pointer;
 }
 .toggle input { accent-color: var(--accent); cursor: pointer; }
+.toggle[data-state="loading"] { opacity: 0.5; cursor: progress; }
+.toggle[data-state="loading"] span::after { content: "（辞書読込中…）"; }
+.toggle[data-state="error"] span::after { content: "（辞書読込失敗）"; color: var(--error); }
 
 .board {
   text-align: center;

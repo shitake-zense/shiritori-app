@@ -1,6 +1,6 @@
 // DOM制御とゲーム進行
 import { judge, lastChar } from "./game.js";
-import { randomStarter, isRealWord } from "./dictionary.js";
+import { randomStarter, isRealWord, loadDictionary } from "./dictionary.js";
 import { loadHistory, saveGame, clearHistory } from "./history.js";
 
 const el = {
@@ -119,6 +119,15 @@ el.resetBtn.addEventListener("click", start);
 el.clearHistoryBtn.addEventListener("click", () => {
   clearHistory();
   renderHistory();
+});
+
+// 辞書(約45,000語)は非同期読み込み。読み込み中はチェックモードを無効化。
+el.dictToggle.disabled = true;
+const dictLabel = el.dictToggle.closest(".toggle");
+if (dictLabel) dictLabel.dataset.state = "loading";
+loadDictionary().then((ok) => {
+  el.dictToggle.disabled = !ok;
+  if (dictLabel) dictLabel.dataset.state = ok ? "ready" : "error";
 });
 
 renderHistory();
