@@ -15,12 +15,22 @@
         <input type="checkbox" id="dictToggle" />
         <span>単語チェック（実在する単語のみ）</span>
       </label>
+      <label class="select">
+        <span>文字数しばり</span>
+        <select id="minLengthSelect">
+          <option value="2">なし</option>
+          <option value="3">3文字以上</option>
+          <option value="4">4文字以上</option>
+          <option value="5">5文字以上</option>
+        </select>
+      </label>
     </header>
 
     <section class="board" aria-live="polite">
       <p class="board__label">前の単語</p>
       <p class="board__word" id="currentWord">―</p>
       <p class="board__next">次は「<span id="nextChar">―</span>」から</p>
+      <p class="board__rule" id="ruleHint" hidden></p>
     </section>
 
     <form class="input" id="wordForm" autocomplete="off">

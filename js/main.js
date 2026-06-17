@@ -14,6 +14,8 @@ const el = {
   historyList: document.getElementById("historyList"),
   clearHistoryBtn: document.getElementById("clearHistoryBtn"),
   dictToggle: document.getElementById("dictToggle"),
+  minLengthSelect: document.getElementById("minLengthSelect"),
+  ruleHint: document.getElementById("ruleHint"),
 };
 
 let state;
@@ -32,7 +34,18 @@ function render() {
   el.currentWord.textContent = prev;
   el.nextChar.textContent = lastChar(prev);
   el.input.disabled = state.over;
+  renderRuleHint();
   renderChain();
+}
+
+function renderRuleHint() {
+  const min = Number(el.minLengthSelect.value);
+  if (min > 2) {
+    el.ruleHint.textContent = `しばり: ${min}文字以上`;
+    el.ruleHint.hidden = false;
+  } else {
+    el.ruleHint.hidden = true;
+  }
 }
 
 function renderChain() {
@@ -81,7 +94,10 @@ el.form.addEventListener("submit", (e) => {
 
   const word = el.input.value.trim();
   const prev = state.words[state.words.length - 1];
-  const opts = el.dictToggle.checked ? { isRealWord } : {};
+  const opts = {};
+  if (el.dictToggle.checked) opts.isRealWord = isRealWord;
+  const minLength = Number(el.minLengthSelect.value);
+  if (minLength > 2) opts.minLength = minLength;
   const result = judge(word, prev, state.used, opts);
 
   if (!result.ok) {
@@ -115,6 +131,7 @@ function endGame(result) {
   renderHistory();
 }
 
+el.minLengthSelect.addEventListener("change", renderRuleHint);
 el.resetBtn.addEventListener("click", start);
 el.clearHistoryBtn.addEventListener("click", () => {
   clearHistory();

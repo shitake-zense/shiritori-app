@@ -48,6 +48,26 @@ body {
 .toggle[data-state="loading"] span::after { content: "（辞書読込中…）"; }
 .toggle[data-state="error"] span::after { content: "（辞書読込失敗）"; color: var(--error); }
 
+.select {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 12px 0 0 14px;
+  font-size: 0.8rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+.select select {
+  font: inherit;
+  color: var(--text);
+  padding: 3px 6px;
+  border: 1.5px solid #e3e6ec;
+  border-radius: 8px;
+  background: var(--card);
+  cursor: pointer;
+}
+.select select:focus { outline: none; border-color: var(--accent); }
+
 .board {
   text-align: center;
   padding: 24px;
@@ -59,6 +79,16 @@ body {
 .board__word { margin: 8px 0; font-size: 2.2rem; font-weight: 700; }
 .board__next { margin: 0; color: var(--muted); font-size: 0.85rem; }
 .board__next span { color: var(--accent); font-weight: 700; }
+.board__rule {
+  display: inline-block;
+  margin: 10px 0 0;
+  padding: 2px 10px;
+  background: #eaf0ff;
+  color: var(--accent);
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
 
 .input { display: flex; gap: 10px; margin-bottom: 14px; }
 .input__field {
