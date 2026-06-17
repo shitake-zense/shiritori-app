@@ -21,6 +21,7 @@ jig.jp 2026 サマーインターン選考課題のしりとりアプリ。Vanil
 
 - `js/game.js` — **DOM非依存の純粋ロジック**。文字正規化（小書き文字・末尾「ー」）、`firstChar`/`lastChar`、入力バリデーション、`judge()` による勝敗・継続判定を持つ。ルール変更はここに集約する。
 - `js/main.js` — DOM制御とゲーム進行。`state`（`words` 配列・`used` Set・`over`）を保持し、`game.js` の判定結果に応じて描画する。DOMアクセスはこのファイルに閉じる。
+- `js/history.js` — 過去ゲーム結果の localStorage 永続化（`loadHistory`/`saveGame`/`clearHistory`、最大20件・新しい順）。
 - `js/dictionary.js` — 初期単語候補・`randomStarter()`・辞書ロジック。辞書本体(`words.json`/約45,000語)は起動時に非同期fetchで読み込む（`loadDictionary()`）。
 - `words.json` — 単語チェック用辞書データ。IPAdicから `tools/build-dictionary.mjs` で生成・コミット済み。語彙更新は `node tools/build-dictionary.mjs` で再生成する。
 - `index.html` / `css/style.css` — 単一画面UI。ミニマル・カードデザイン。
@@ -31,4 +32,4 @@ jig.jp 2026 サマーインターン選考課題のしりとりアプリ。Vanil
 
 - 日本語コメント・日本語UI。
 - コミットは機能単位で細かく分割し、`feat:` / `docs:` / `chore:` 等のprefixを付ける。
-- 追加機能の実装順: 履歴表示 → 単語チェックモード → 独自縛りルール → 複数人対戦（後半・必要時のみ Firebase 導入を検討）。
+- 追加機能の実装順: 履歴表示(済) → 単語チェックモード(済) → 独自縛りルール(次) → 複数人対戦（後半・必要時のみ Firebase 導入を検討）。
