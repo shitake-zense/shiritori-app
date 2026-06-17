@@ -12,7 +12,8 @@ jig.jp 2026サマーインターン課題のしりとりアプリ。再起動時
 
 ## 技術スタック
 Vanilla JS(ESモジュール) + プレーンCSS、ビルドなし、GitHub Pages配信。
-Firebaseは複数人対戦(後半)で必要時のみ導入。
+オンライン対戦は Firebase Realtime Database を導入済み（CDNからESモジュール読込）。設定は `js/firebase-config.js`＋`docs/FIREBASE.md`。
+UIは和モダン（墨×朱×和紙）。WebフォントはGoogle Fonts（Shippori Mincho B1 / Zen Kaku Gothic New）。
 
 ## 公開URL
 https://shitake-zense.github.io/shiritori-app/
@@ -27,16 +28,24 @@ https://shitake-zense.github.io/shiritori-app/
   - [x] 独自縛りルール: 文字数しばり（N文字以上／なし・3・4・5）。judgeにopts.minLength注入
   - [x] README完成（課題提出用・概要/遊び方/機能/構成/実行手順）
   - [x] UI磨き: 和モダン（墨×朱×和紙）へ全面リデザイン。明朝×ゴシック、判子モチーフ、グレイン、勝敗/入力アニメ（prefers-reduced-motion対応）
-- [ ] **M5 複数人対戦**（Firebase Realtime Database・ルームコード方式）← 進行中
-  - [x] Round A: ロジック層 `js/online.js`（createRoom/joinRoom/subscribeRoom/submitWord/rematch/leaveRoom）。判定はjudge()をtransaction内で権威評価。`js/firebase-config.js`テンプレ・`docs/FIREBASE.md`手順書
-  - [x] あなたの作業: Firebaseプロジェクト作成・config設定（databaseURL=米国リージョン）。DBルールはdocs/FIREBASE.md参照で要確認
-  - [x] Round B: UI統合（ひとり/ふたり対戦モード切替・ルーム作成/参加・手番/相手切断/勝敗/再戦表示）。main.jsをソロ/オンライン2モード構成にリファクタ
-  - [x] 実機確認OK（ユーザー）。画面遷移を分離: オンラインは「作成/参加画面」↔「対戦画面」をapplyView()で切替、ルールは作成画面のみ編集可。[hidden]の!important化で潜在バグ解消
-  - [ ] **次**: 画面遷移版の再確認。問題なければM5完了
+- [x] **M5 複数人対戦＝オンライン対戦**（push済み・Firebase Realtime Database・ルームコード方式）
+  - [x] Round A: ロジック層 `js/online.js`（createRoom/joinRoom/subscribeRoom/submitWord/rematch/leaveRoom）。判定はjudge()をtransaction内で権威評価。`js/firebase-config.js`＋`docs/FIREBASE.md`手順書
+  - [x] Firebaseプロジェクト作成・config設定（databaseURL=米国リージョン）・DBルール反映
+  - [x] Round B: UI統合（ひとり/ふたり対戦モード切替・ルーム作成/参加・手番/相手切断/勝敗/再戦）。main.jsをソロ/オンライン2モード構成にリファクタ
+  - [x] 画面遷移を分離: オンラインは「作成/参加画面」↔「対戦画面」を `applyView()` で切替、ルールは作成画面のみ編集可。`[hidden]`の!important化で潜在バグ解消。実機確認OK
+
+## 完了状況
+M1〜M5まで実装済み。課題の必須要件＋独自機能（履歴・単語チェック・文字数しばり・オンライン対戦）が揃った状態。
+
+### 既知の調整候補（未対応・任意）
+- guest（参加側）の作成画面でもルール欄が見えるが、参加時はホストのルームルールが適用される（作成時のみ反映）。混乱回避なら参加欄でルールを無効表示にする調整が可能。
+- 履歴保存はソロのみ（オンライン結果は未保存）。
+- DBルールは認証なしの公開ルーム（選考デモ向け）。本番運用ならFirebase Auth併用が望ましい。
 
 ## 設計メモ
-- ロジック(game.js)とDOM(main.js)を分離。judge()の戻り値 `{ok, reason?, end?}` が状態遷移の中心
-- `end: "lose"` =「ん」終了・重複。新ルールはこの契約を保って game.js に追加する
+- ロジック(game.js)とDOM(main.js)を分離。judge()の戻り値 `{ok, reason?, end?}` が状態遷移の中心。online.jsもこの`judge()`を権威判定に使う
+- `end: "lose"` =「ん」終了・重複。文字数しばり違反は `ok:false`（endなし）。新ルールはこの契約を保って game.js に追加する
+- オンライン: ルームデータ構造は `docs/FIREBASE.md` 参照。`submitWord`は手番検証＋判定をtransactionで原子的に行う
 
 ## 更新ルール
 タスク完了ごとに本ファイルの進捗チェックボックスと「次はここ」を更新する。
