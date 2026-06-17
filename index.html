@@ -22,7 +22,7 @@
       <p class="masthead__sub">前の言葉の終わりから、次の言葉へ。</p>
     </header>
 
-    <div class="mode" role="tablist" aria-label="対戦モード">
+    <div class="mode" id="modeTabs" role="tablist" aria-label="対戦モード">
       <button class="mode__btn is-active" id="modeSolo" type="button" role="tab" aria-selected="true">ひとり</button>
       <button class="mode__btn" id="modeOnline" type="button" role="tab" aria-selected="false">ふたり対戦</button>
     </div>
@@ -92,7 +92,7 @@
 
     <ol class="chain" id="chain" aria-label="この対戦の言葉のつながり"></ol>
 
-    <div class="actions">
+    <div class="actions" id="actions">
       <button class="btn btn--ghost" id="resetBtn" type="button">はじめから</button>
       <button class="btn btn--solid" id="rematchBtn" type="button" hidden>再戦する</button>
     </div>

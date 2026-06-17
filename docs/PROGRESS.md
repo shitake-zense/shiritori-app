@@ -31,7 +31,8 @@ https://shitake-zense.github.io/shiritori-app/
   - [x] Round A: ロジック層 `js/online.js`（createRoom/joinRoom/subscribeRoom/submitWord/rematch/leaveRoom）。判定はjudge()をtransaction内で権威評価。`js/firebase-config.js`テンプレ・`docs/FIREBASE.md`手順書
   - [x] あなたの作業: Firebaseプロジェクト作成・config設定（databaseURL=米国リージョン）。DBルールはdocs/FIREBASE.md参照で要確認
   - [x] Round B: UI統合（ひとり/ふたり対戦モード切替・ルーム作成/参加・手番/相手切断/勝敗/再戦表示）。main.jsをソロ/オンライン2モード構成にリファクタ
-  - [ ] **次**: 2タブ/2端末での実機動作確認（docs/FIREBASE.md「動作確認」）。問題なければM5完了
+  - [x] 実機確認OK（ユーザー）。画面遷移を分離: オンラインは「作成/参加画面」↔「対戦画面」をapplyView()で切替、ルールは作成画面のみ編集可。[hidden]の!important化で潜在バグ解消
+  - [ ] **次**: 画面遷移版の再確認。問題なければM5完了
 
 ## 設計メモ
 - ロジック(game.js)とDOM(main.js)を分離。judge()の戻り値 `{ok, reason?, end?}` が状態遷移の中心

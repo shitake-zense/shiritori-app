@@ -18,6 +18,8 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
+.view-in { animation: rise 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 
 body {
   margin: 0;

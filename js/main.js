@@ -21,9 +21,11 @@ const el = {
   minLengthSelect: document.getElementById("minLengthSelect"),
   ruleHint: document.getElementById("ruleHint"),
   // モード・オンライン
+  modeTabs: document.getElementById("modeTabs"),
   modeSolo: document.getElementById("modeSolo"),
   modeOnline: document.getElementById("modeOnline"),
   rules: document.getElementById("rules"),
+  actions: document.getElementById("actions"),
   lobby: document.getElementById("lobby"),
   createRoomBtn: document.getElementById("createRoomBtn"),
   joinForm: document.getElementById("joinForm"),
@@ -174,15 +176,43 @@ function seatOf(room, seat) {
   return Object.values(players).find((p) => p.seat === seat) || null;
 }
 
+/** 画面（ソロ盤面 / ロビー / 対戦盤面）の表示を一括制御する */
+function applyView() {
+  const isOnline = mode === "online";
+  const inGame = isOnline && !!session;        // オンラインかつ入室中＝対戦画面
+
+  el.modeTabs.hidden = inGame;                 // 対戦中はモードタブを隠す
+  el.rules.hidden = inGame;                    // ルールは作成画面でのみ編集可
+  el.lobby.hidden = !isOnline || inGame;       // ロビーはオンラインの作成画面のみ
+  el.roomBanner.hidden = !inGame;
+
+  const showPlay = !isOnline || inGame;        // ソロ or 対戦中は盤面を表示
+  el.board.hidden = !showPlay;
+  el.form.hidden = !showPlay;
+  el.chain.hidden = !showPlay;
+  el.message.hidden = !showPlay;
+
+  el.resetBtn.hidden = isOnline;               // 「はじめから」はソロのみ
+  el.actions.hidden = isOnline;                // オンラインの操作列は決着時にrenderOnlineが開放
+}
+
+function updateModeTabs() {
+  const isOnline = mode === "online";
+  el.modeSolo.classList.toggle("is-active", !isOnline);
+  el.modeOnline.classList.toggle("is-active", isOnline);
+  el.modeSolo.setAttribute("aria-selected", String(!isOnline));
+  el.modeOnline.setAttribute("aria-selected", String(isOnline));
+}
+
 function startSubscription(sess) {
   session = sess;
   if (unsub) unsub();
   lastRoom = null;
   unsub = online.subscribeRoom(session.code, renderOnline);
   el.roomCode.textContent = session.code;
-  el.lobby.hidden = true;
-  el.roomBanner.hidden = false;
-  el.rematchBtn.hidden = true;
+  applyView();                                 // ロビー → 対戦画面へ遷移
+  flash(el.roomBanner, "view-in");
+  flash(el.board, "view-in");
 }
 
 function renderOnline(room) {
@@ -214,6 +244,7 @@ function renderOnline(room) {
   if (room.status === "waiting") {
     el.roomStatus.textContent = "相手を待っています…";
     setMessage(`コード「${session.code}」を相手に共有してね（あなたは${seatLabel}）`, "");
+    el.actions.hidden = true;
     el.rematchBtn.hidden = true;
   } else if (room.status === "playing") {
     const disconnected = opponent && opponent.online === false;
@@ -226,6 +257,7 @@ function renderOnline(room) {
     } else {
       setMessage("相手の入力を待っています…", "");
     }
+    el.actions.hidden = true;
     el.rematchBtn.hidden = true;
   } else if (room.status === "over") {
     const iLost = room.loser === session.seat;
@@ -233,6 +265,7 @@ function renderOnline(room) {
     setMessage(iLost ? "あなたの負け…" : "あなたの勝ち！", iLost ? "lose" : "win");
     if (iLost) flash(el.board, "is-lose");
     el.input.disabled = true;
+    el.actions.hidden = false;                 // 決着時のみ操作列を表示
     el.rematchBtn.hidden = false;
   }
 
@@ -303,10 +336,9 @@ async function onLeaveRoom() {
   if (session) await online.leaveRoom(session);
   session = null;
   lastRoom = null;
-  el.roomBanner.hidden = true;
-  el.lobby.hidden = false;
   el.rematchBtn.hidden = true;
   el.lobbyMsg.textContent = "";
+  el.roomCodeInput.value = "";
   el.input.value = "";
   el.input.disabled = true;
   setMessage("");
@@ -314,6 +346,8 @@ async function onLeaveRoom() {
   el.nextChar.textContent = "―";
   el.chain.innerHTML = "";
   el.ruleHint.hidden = true;
+  applyView();                                 // 対戦画面 → ロビーへ遷移
+  flash(el.lobby, "view-in");
 }
 
 async function onRematch() {
@@ -337,30 +371,27 @@ function ensureConfigured() {
 // ───────── モード切替 ─────────
 function setMode(next) {
   if (mode === next) return;
-  if (mode === "online") onLeaveRoom();
+  if (mode === "online" && session) {
+    if (unsub) { unsub(); unsub = null; }
+    online.leaveRoom(session);
+    session = null;
+    lastRoom = null;
+  }
   mode = next;
-
-  const isOnline = next === "online";
-  el.modeSolo.classList.toggle("is-active", !isOnline);
-  el.modeOnline.classList.toggle("is-active", isOnline);
-  el.modeSolo.setAttribute("aria-selected", String(!isOnline));
-  el.modeOnline.setAttribute("aria-selected", String(isOnline));
-
-  el.resetBtn.hidden = isOnline;
-  el.lobby.hidden = !isOnline || !!session;
-  el.roomBanner.hidden = true;
+  updateModeTabs();
   el.rematchBtn.hidden = true;
 
-  if (isOnline) {
+  if (next === "online") {
     setMessage("");
     el.input.value = "";
     el.input.disabled = true;
-    el.currentWord.textContent = "―";
-    el.nextChar.textContent = "―";
-    el.chain.innerHTML = "";
-    el.ruleHint.hidden = true;
+    el.lobbyMsg.textContent = "";
+    el.roomCodeInput.value = "";
+    applyView();
+    flash(el.lobby, "view-in");
     ensureConfigured();
   } else {
+    applyView();
     soloStart();
   }
 }
@@ -402,4 +433,5 @@ loadDictionary().then((ok) => {
 });
 
 renderHistory();
+applyView();
 soloStart();
