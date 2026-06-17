@@ -4,6 +4,7 @@ import { randomStarter, isRealWord, loadDictionary } from "./dictionary.js";
 import { loadHistory, saveGame, clearHistory } from "./history.js";
 
 const el = {
+  board: document.getElementById("board"),
   currentWord: document.getElementById("currentWord"),
   nextChar: document.getElementById("nextChar"),
   input: document.getElementById("wordInput"),
@@ -80,6 +81,13 @@ function setMessage(text, type = "") {
   el.message.className = `message${type ? " message--" + type : ""}`;
 }
 
+/** クラスを付け直してCSSアニメを再生する（reflowで再トリガ） */
+function flash(node, cls) {
+  node.classList.remove(cls);
+  void node.offsetWidth;
+  node.classList.add(cls);
+}
+
 function start() {
   state = newState();
   setMessage("");
@@ -105,6 +113,9 @@ el.form.addEventListener("submit", (e) => {
       state.words.push(word);
       state.used.add(word);
       endGame("lose");
+      flash(el.board, "is-lose");
+    } else {
+      flash(el.input, "is-shake");
     }
     setMessage(result.reason, result.end ? "lose" : "error");
     return;
@@ -117,10 +128,12 @@ el.form.addEventListener("submit", (e) => {
   if (result.end) {
     endGame(result.end);
     setMessage(result.reason, result.end);
+    flash(el.board, "is-lose");
   } else {
-    setMessage("OK！次どうぞ", "ok");
+    setMessage("よし、次へ", "ok");
+    render();
+    flash(el.board, "is-ok");
   }
-  render();
   el.input.focus();
 });
 

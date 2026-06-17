@@ -23,11 +23,11 @@ https://shitake-zense.github.io/shiritori-app/
 - [x] **M3 単語チェックモード**（push済み）: ON/OFFトグル。judgeにopts.isRealWordを注入する設計
   - 辞書はIPAdic(mecab-ipadic)から `tools/build-dictionary.mjs` で生成した約45,000語(`words.json`/濁点語含む)。起動時に非同期fetchで読み込む（読込中はトグル無効）
   - 辞書更新: `node tools/build-dictionary.mjs` で words.json 再生成
-- [ ] **M4 独自縛りルール + UI磨き + README完成**← 進行中
+- [x] **M4 独自縛りルール + UI磨き + README完成**（push済み）
   - [x] 独自縛りルール: 文字数しばり（N文字以上／なし・3・4・5）。judgeにopts.minLength注入
   - [x] README完成（課題提出用・概要/遊び方/機能/構成/実行手順）
-  - [ ] UI磨き ← 次はここ
-- [ ] **M5 複数人対戦**（後半・Firebase要相談）
+  - [x] UI磨き: 和モダン（墨×朱×和紙）へ全面リデザイン。明朝×ゴシック、判子モチーフ、グレイン、勝敗/入力アニメ（prefers-reduced-motion対応）
+- [ ] **M5 複数人対戦**（後半・Firebase要相談）← 次はここ
 
 ## 設計メモ
 - ロジック(game.js)とDOM(main.js)を分離。judge()の戻り値 `{ok, reason?, end?}` が状態遷移の中心

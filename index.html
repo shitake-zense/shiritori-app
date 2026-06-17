@@ -3,33 +3,51 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>しりとり</title>
+  <title>しりとり｜言葉繋ぎ</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@600;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap"
+    rel="stylesheet"
+  />
   <link rel="stylesheet" href="./css/style.css" />
 </head>
 <body>
+  <div class="grain" aria-hidden="true"></div>
+
   <main class="app">
-    <header class="app__header">
-      <h1 class="app__title">しりとり</h1>
-      <p class="app__subtitle">前の単語の最後の文字から続けてね</p>
-      <label class="toggle">
-        <input type="checkbox" id="dictToggle" />
-        <span>単語チェック（実在する単語のみ）</span>
-      </label>
-      <label class="select">
-        <span>文字数しばり</span>
-        <select id="minLengthSelect">
-          <option value="2">なし</option>
-          <option value="3">3文字以上</option>
-          <option value="4">4文字以上</option>
-          <option value="5">5文字以上</option>
-        </select>
-      </label>
+    <header class="masthead">
+      <p class="masthead__kicker">言葉を繋ぐ遊び</p>
+      <h1 class="masthead__title">しりとり</h1>
+      <p class="masthead__sub">前の言葉の終わりから、次の言葉へ。</p>
     </header>
 
-    <section class="board" aria-live="polite">
-      <p class="board__label">前の単語</p>
+    <section class="rules" aria-label="ルール設定">
+      <p class="rules__head">ルール</p>
+      <div class="rules__row">
+        <label class="toggle">
+          <input type="checkbox" id="dictToggle" />
+          <span>単語チェック（実在語のみ）</span>
+        </label>
+        <label class="select">
+          <span>文字数しばり</span>
+          <select id="minLengthSelect">
+            <option value="2">なし</option>
+            <option value="3">3字以上</option>
+            <option value="4">4字以上</option>
+            <option value="5">5字以上</option>
+          </select>
+        </label>
+      </div>
+    </section>
+
+    <section class="board" id="board" aria-live="polite">
+      <p class="board__label">今の言葉</p>
       <p class="board__word" id="currentWord">―</p>
-      <p class="board__next">次は「<span id="nextChar">―</span>」から</p>
+      <div class="seal" aria-hidden="true">
+        <span class="seal__label">次</span>
+        <span class="seal__char" id="nextChar">―</span>
+      </div>
       <p class="board__rule" id="ruleHint" hidden></p>
     </section>
 
@@ -41,15 +59,15 @@
         placeholder="ひらがなで入力"
         aria-label="単語を入力"
       />
-      <button class="input__submit" type="submit">送信</button>
+      <button class="input__submit" type="submit">継ぐ</button>
     </form>
 
     <p class="message" id="message" role="status"></p>
 
-    <ol class="chain" id="chain" aria-label="この対戦の単語履歴"></ol>
+    <ol class="chain" id="chain" aria-label="この対戦の言葉のつながり"></ol>
 
     <div class="actions">
-      <button class="btn btn--ghost" id="resetBtn" type="button">リセット</button>
+      <button class="btn btn--ghost" id="resetBtn" type="button">はじめから</button>
     </div>
 
     <section class="history">
