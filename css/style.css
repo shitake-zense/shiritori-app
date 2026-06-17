@@ -90,6 +90,97 @@ body {
   letter-spacing: 0.04em;
 }
 
+/* ── モード切替（先攻の朱／和紙の地） ─────────── */
+.mode {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  padding: 4px;
+  background: var(--washi);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.mode__btn {
+  flex: 1;
+  padding: 9px 0;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+.mode__btn.is-active {
+  color: #fff;
+  background: var(--sumi);
+}
+
+/* ── オンラインロビー ─────────────────────────── */
+.lobby {
+  margin-bottom: 22px;
+  padding: 20px 18px;
+  background: var(--washi);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  text-align: center;
+}
+.lobby__hint { margin: 8px 0 0; font-size: 0.74rem; color: var(--muted); }
+.lobby__or {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0;
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+.lobby__or::before, .lobby__or::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+.lobby__join { display: flex; gap: 8px; }
+.lobby__join .input__field { text-transform: uppercase; letter-spacing: 0.25em; text-align: center; }
+.lobby__msg { min-height: 1.2em; margin: 12px 0 0; font-size: 0.8rem; color: var(--sumi-soft); }
+.lobby__msg--error { color: var(--shu); }
+
+.btn--solid {
+  background: var(--shu);
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+.btn--solid:hover { background: var(--shu-deep); }
+.btn--solid:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── ルーム情報バナー ─────────────────────────── */
+.room {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+  padding: 12px 16px;
+  background: var(--sumi);
+  color: #f3ede0;
+  border-radius: var(--radius);
+}
+.room__info { display: flex; align-items: baseline; gap: 8px; }
+.room__code-label { font-size: 0.68rem; letter-spacing: 0.25em; opacity: 0.7; }
+.room__code {
+  font-family: var(--serif);
+  font-weight: 800;
+  font-size: 1.3rem;
+  letter-spacing: 0.3em;
+  color: #fff;
+}
+.room__status { flex: 1; margin: 0; font-size: 0.82rem; letter-spacing: 0.05em; }
+.room .btn--text { color: rgba(243, 237, 224, 0.7); }
+.room .btn--text:hover { color: #fff; }
+
 /* ── ルール設定パネル ─────────────────────────── */
 .rules {
   position: relative;

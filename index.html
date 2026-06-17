@@ -22,7 +22,12 @@
       <p class="masthead__sub">前の言葉の終わりから、次の言葉へ。</p>
     </header>
 
-    <section class="rules" aria-label="ルール設定">
+    <div class="mode" role="tablist" aria-label="対戦モード">
+      <button class="mode__btn is-active" id="modeSolo" type="button" role="tab" aria-selected="true">ひとり</button>
+      <button class="mode__btn" id="modeOnline" type="button" role="tab" aria-selected="false">ふたり対戦</button>
+    </div>
+
+    <section class="rules" id="rules" aria-label="ルール設定">
       <p class="rules__head">ルール</p>
       <div class="rules__row">
         <label class="toggle">
@@ -39,6 +44,27 @@
           </select>
         </label>
       </div>
+    </section>
+
+    <section class="lobby" id="lobby" hidden aria-label="オンライン対戦ロビー">
+      <button class="btn btn--solid" id="createRoomBtn" type="button">ルームを作る</button>
+      <p class="lobby__hint">上のルール設定で部屋を作成し、コードを相手に共有します</p>
+      <div class="lobby__or"><span>または</span></div>
+      <form class="lobby__join" id="joinForm" autocomplete="off">
+        <input class="input__field" id="roomCodeInput" maxlength="8"
+               placeholder="ルームコード" aria-label="ルームコード" />
+        <button class="btn btn--ghost" id="joinRoomBtn" type="submit">参加</button>
+      </form>
+      <p class="lobby__msg" id="lobbyMsg" role="status"></p>
+    </section>
+
+    <section class="room" id="roomBanner" hidden>
+      <div class="room__info">
+        <span class="room__code-label">ルーム</span>
+        <span class="room__code" id="roomCode">----</span>
+      </div>
+      <p class="room__status" id="roomStatus"></p>
+      <button class="btn btn--text" id="leaveBtn" type="button">退出</button>
     </section>
 
     <section class="board" id="board" aria-live="polite">
@@ -68,6 +94,7 @@
 
     <div class="actions">
       <button class="btn btn--ghost" id="resetBtn" type="button">はじめから</button>
+      <button class="btn btn--solid" id="rematchBtn" type="button" hidden>再戦する</button>
     </div>
 
     <section class="history">

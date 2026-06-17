@@ -8,14 +8,23 @@
 // Realtime Database を使うため databaseURL は必須。
 
 export const firebaseConfig = {
-  apiKey: "REPLACE_ME",
-  authDomain: "REPLACE_ME.firebaseapp.com",
-  databaseURL: "https://REPLACE_ME-default-rtdb.firebaseio.com",
-  projectId: "REPLACE_ME",
-  appId: "REPLACE_ME",
+  apiKey: "AIzaSyCVeolT0ogivVQcX0nIswl5kyumn7TiJmw",
+  authDomain: "shiritori-app-733cc.firebaseapp.com",
+  // ↓ Realtime Database に必須。RTDBコンソールのデータタブ上部に表示されるURLを貼る。
+  //   米国リージョン例: https://shiritori-app-733cc-default-rtdb.firebaseio.com
+  //   それ以外の例:     https://shiritori-app-733cc-default-rtdb.<region>.firebasedatabase.app
+  databaseURL: "https://shiritori-app-733cc-default-rtdb.firebaseio.com/",
+  projectId: "shiritori-app-733cc",
+  storageBucket: "shiritori-app-733cc.firebasestorage.app",
+  messagingSenderId: "685827522375",
+  appId: "1:685827522375:web:aaa0a7ee6861246a571662"
 };
 
-/** 設定がまだプレースホルダのままか */
+/** 設定が完了しているか（databaseURL はRTDBに必須なので併せて確認） */
 export function isConfigured() {
-  return firebaseConfig.apiKey !== "REPLACE_ME";
+  return (
+    firebaseConfig.apiKey !== "REPLACE_ME" &&
+    !!firebaseConfig.databaseURL &&
+    firebaseConfig.databaseURL !== "REPLACE_ME"
+  );
 }
