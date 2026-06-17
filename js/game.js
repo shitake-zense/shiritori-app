@@ -34,11 +34,16 @@ export function endsWithN(word) {
 
 /**
  * 入力単語を判定する。
+ * @param {object} [opts]
+ * @param {(w:string)=>boolean} [opts.isRealWord] 指定時、実在語チェックを行う
  * @returns {{ok:boolean, reason?:string, end?:"win"|"lose"}}
  */
-export function judge(word, prevWord, usedSet) {
+export function judge(word, prevWord, usedSet, opts = {}) {
   if (!isValidInput(word)) {
     return { ok: false, reason: "ひらがな2文字以上で入力してね" };
+  }
+  if (opts.isRealWord && !opts.isRealWord(word)) {
+    return { ok: false, reason: `「${word}」は辞書にない単語です` };
   }
   if (usedSet.has(word)) {
     return { ok: false, end: "lose", reason: `「${word}」は既出！あなたの負け` };

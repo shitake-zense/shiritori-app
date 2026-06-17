@@ -1,6 +1,6 @@
 // DOM制御とゲーム進行
 import { judge, lastChar } from "./game.js";
-import { randomStarter } from "./dictionary.js";
+import { randomStarter, isRealWord } from "./dictionary.js";
 import { loadHistory, saveGame, clearHistory } from "./history.js";
 
 const el = {
@@ -13,6 +13,7 @@ const el = {
   chain: document.getElementById("chain"),
   historyList: document.getElementById("historyList"),
   clearHistoryBtn: document.getElementById("clearHistoryBtn"),
+  dictToggle: document.getElementById("dictToggle"),
 };
 
 let state;
@@ -80,7 +81,8 @@ el.form.addEventListener("submit", (e) => {
 
   const word = el.input.value.trim();
   const prev = state.words[state.words.length - 1];
-  const result = judge(word, prev, state.used);
+  const opts = el.dictToggle.checked ? { isRealWord } : {};
+  const result = judge(word, prev, state.used, opts);
 
   if (!result.ok) {
     if (result.end === "lose") {

@@ -20,8 +20,8 @@ https://shitake-zense.github.io/shiritori-app/
 ## 進捗
 - [x] **M1 必須機能MVP**（push済み）: 前単語表示 / 文字一致判定 / エラー表示 / 「ん」終了 / 重複終了 / リセット / ランダム初期単語 / ひらがな限定バリデーション
 - [x] **M2 履歴表示**（push済み）: 対戦中の単語チェーン表示 + 過去ゲーム結果のlocalStorage保存・一覧・クリア
-- [ ] **M3 単語チェックモード**（小規模・厳選辞書で実在語判定）← 次はここ
-- [ ] **M4 独自縛りルール + UI磨き + README完成**
+- [x] **M3 単語チェックモード**（push済み）: 厳選辞書(dictionary.js WORDS)＋ON/OFFトグル。judgeにopts.isRealWordを注入する設計
+- [ ] **M4 独自縛りルール + UI磨き + README完成**← 次はここ
 - [ ] **M5 複数人対戦**（後半・Firebase要相談）
 
 ## 設計メモ
