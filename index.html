@@ -4,6 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>しりとり｜言葉繋ぎ</title>
+  <link rel="icon" type="image/png" href="./shiritori.png" />
+  <link rel="apple-touch-icon" href="./shiritori.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
@@ -36,14 +38,19 @@
         </label>
         <label class="select">
           <span>文字数しばり</span>
-          <select id="minLengthSelect">
-            <option value="2">なし</option>
-            <option value="3">3字以上</option>
-            <option value="4">4字以上</option>
-            <option value="5">5字以上</option>
+          <select id="lengthSelect">
+            <option value="none">なし</option>
+            <option value="exact3">ちょうど3文字</option>
+            <option value="min3">3字以上</option>
+            <option value="min4">4字以上</option>
+            <option value="min5">5字以上</option>
           </select>
         </label>
-        <label class="select">
+        <label class="toggle">
+          <input type="checkbox" id="timeToggle" />
+          <span>時間制限</span>
+        </label>
+        <label class="select" id="limitWrap" hidden>
           <span>解答時間</span>
           <input class="select__num" id="limitInput" type="number"
                  min="3" max="100" step="1" value="10" inputmode="numeric" />
@@ -51,6 +58,10 @@
         </label>
       </div>
     </section>
+
+    <div class="actions" id="startActions" hidden>
+      <button class="btn btn--solid" id="startBtn" type="button">しりとりを始める</button>
+    </div>
 
     <section class="lobby" id="lobby" hidden aria-label="オンライン対戦ロビー">
       <button class="btn btn--solid" id="createRoomBtn" type="button">ルームを作る</button>
@@ -99,6 +110,8 @@
     </form>
 
     <p class="message" id="message" role="status"></p>
+
+    <p class="streak" id="streak" hidden></p>
 
     <ol class="chain" id="chain" aria-label="この対戦の言葉のつながり"></ol>
 

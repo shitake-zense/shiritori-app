@@ -82,7 +82,8 @@ export async function createRoom({ name, rule } = {}) {
   const safeRule = {
     dictCheck: !!(rule && rule.dictCheck),
     minLength: (rule && rule.minLength) || 2,
-    limitSec: clampLimit(rule && rule.limitSec),
+    exactLength: (rule && rule.exactLength) || 0,
+    limitSec: rule && rule.limitSec ? clampLimit(rule.limitSec) : 0, // 0=制限なし
   };
 
   for (let attempt = 0; attempt < 5; attempt++) {
@@ -171,6 +172,7 @@ export async function submitWord({ code, seat }, word) {
     const opts = {};
     if (room.rule && room.rule.dictCheck) opts.isRealWord = isRealWord;
     if (room.rule && room.rule.minLength > 2) opts.minLength = room.rule.minLength;
+    if (room.rule && room.rule.exactLength) opts.exactLength = room.rule.exactLength;
 
     const res = judge(word, prev, used, opts);
     outcome = res;

@@ -18,9 +18,12 @@ const el = {
   historyList: document.getElementById("historyList"),
   clearHistoryBtn: document.getElementById("clearHistoryBtn"),
   dictToggle: document.getElementById("dictToggle"),
-  minLengthSelect: document.getElementById("minLengthSelect"),
+  lengthSelect: document.getElementById("lengthSelect"),
+  timeToggle: document.getElementById("timeToggle"),
+  limitWrap: document.getElementById("limitWrap"),
   limitInput: document.getElementById("limitInput"),
   ruleHint: document.getElementById("ruleHint"),
+  streak: document.getElementById("streak"),
   timer: document.getElementById("timer"),
   timerBar: document.getElementById("timerBar"),
   timerNum: document.getElementById("timerNum"),
@@ -30,6 +33,8 @@ const el = {
   modeOnline: document.getElementById("modeOnline"),
   rules: document.getElementById("rules"),
   actions: document.getElementById("actions"),
+  startActions: document.getElementById("startActions"),
+  startBtn: document.getElementById("startBtn"),
   lobby: document.getElementById("lobby"),
   createRoomBtn: document.getElementById("createRoomBtn"),
   joinForm: document.getElementById("joinForm"),
@@ -42,6 +47,7 @@ const el = {
 };
 
 let mode = "solo";        // "solo" | "online"
+let soloPhase = "setup";  // "setup"（ルール設定中）| "play"（対戦中・ルール固定）
 let state;                // ソロ用の状態
 let session = null;       // { code, playerId, seat }
 let unsub = null;         // ルーム購読解除関数
@@ -49,11 +55,53 @@ let lastRoom = null;      // 直近のルームスナップショット（差分
 
 let timerId = null;       // カウントダウンの interval
 
+// ───────── ルール設定（UI読み取り） ─────────
 /** 解答時間（秒）。入力値を3〜100に丸める（既定10） */
 function ruleLimitSec() {
   let v = parseInt(el.limitInput.value, 10);
   if (isNaN(v)) v = 10;
   return Math.max(3, Math.min(100, v));
+}
+
+function timeEnabled() {
+  return el.timeToggle.checked;
+}
+
+/** 文字数しばりの選択値を {minLength?} / {exactLength?} に変換 */
+function soloLength() {
+  const v = el.lengthSelect.value;
+  if (v === "exact3") return { exactLength: 3 };
+  if (v.startsWith("min")) return { minLength: Number(v.slice(3)) };
+  return {};
+}
+
+/** しばりの表示文字列（盤面バッジ用） */
+function lengthHint(l) {
+  if (l && l.exactLength) return `ちょうど${l.exactLength}文字`;
+  if (l && l.minLength > 2) return `${l.minLength}文字以上`;
+  return "";
+}
+
+/** 現在のルール設定のスナップショット（履歴保存・ルーム作成で共用） */
+function ruleSnapshot() {
+  const l = soloLength();
+  return {
+    dictCheck: el.dictToggle.checked,
+    minLength: l.minLength || 0,
+    exactLength: l.exactLength || 0,
+    limitSec: timeEnabled() ? ruleLimitSec() : 0,
+  };
+}
+
+/** ルールを短い文字列に要約（履歴表示用） */
+function ruleSummary(rule) {
+  if (!rule) return "通常ルール";
+  const p = [];
+  if (rule.dictCheck) p.push("辞書チェック");
+  if (rule.exactLength) p.push(`${rule.exactLength}文字ちょうど`);
+  else if (rule.minLength > 2) p.push(`${rule.minLength}字以上`);
+  if (rule.limitSec) p.push(`制限${rule.limitSec}秒`);
+  return p.length ? p.join("・") : "通常ルール";
 }
 
 function stopTimer() {
@@ -86,20 +134,32 @@ function runTimer(deadline, limitMs, nowFn, onExpire) {
 }
 
 // ───────── 共通描画 ─────────
-function renderBoard(words, minLength) {
+function renderBoard(words, hint) {
   const prev = words[words.length - 1];
   el.currentWord.textContent = prev ?? "―";
   el.nextChar.textContent = prev ? lastChar(prev) : "―";
-  renderRuleHint(minLength);
+  renderRuleHint(hint);
+  renderStreak(words);
   renderChain(words);
 }
 
-function renderRuleHint(minLength) {
-  if (minLength > 2) {
-    el.ruleHint.textContent = `しばり: ${minLength}文字以上`;
+function renderRuleHint(hint) {
+  if (hint) {
+    el.ruleHint.textContent = `しばり: ${hint}`;
     el.ruleHint.hidden = false;
   } else {
     el.ruleHint.hidden = true;
+  }
+}
+
+/** 連続成功回数（初期単語を除いてつないだ数）を表示 */
+function renderStreak(words) {
+  const n = Math.max(0, words.length - 1);
+  if (n > 0) {
+    el.streak.textContent = `連続 ${n} 回つながり中`;
+    el.streak.hidden = false;
+  } else {
+    el.streak.hidden = true;
   }
 }
 
@@ -137,6 +197,7 @@ function renderHistory() {
     li.className = "history__item";
     li.innerHTML =
       `<span class="history__meta">${g.date}・${g.length}語</span>` +
+      `<span class="history__rule">${ruleSummary(g.rule)}</span>` +
       `<span class="history__words">${g.words.join(" → ")}</span>`;
     el.historyList.appendChild(li);
   });
@@ -148,26 +209,43 @@ function newState() {
   return { words: [starter], used: new Set([starter]), over: false };
 }
 
-function soloMinLength() {
-  const m = Number(el.minLengthSelect.value);
-  return m;
-}
-
 function renderSolo() {
-  renderBoard(state.words, soloMinLength());
+  renderBoard(state.words, lengthHint(soloLength()));
   el.input.disabled = state.over;
 }
 
-function soloStart() {
-  state = newState();
+/** ルール設定画面（プレイ前）へ。ルールが編集可能になる。 */
+function soloToSetup() {
+  soloPhase = "setup";
+  stopTimer();
+  state = undefined;
   setMessage("");
   el.input.value = "";
+  el.currentWord.textContent = "―";
+  el.nextChar.textContent = "―";
+  el.chain.innerHTML = "";
+  el.ruleHint.hidden = true;
+  el.streak.hidden = true;
+  applyView();
+  flash(el.rules, "view-in");
+}
+
+/** 開始ボタン: ルールを確定してしりとり開始（以降ルール変更不可）。 */
+function soloBegin() {
+  soloPhase = "play";
+  state = newState();
+  state.rule = ruleSnapshot();
+  setMessage("");
+  el.input.value = "";
+  applyView();
   renderSolo();
-  startSoloTimer();
+  if (timeEnabled()) startSoloTimer();
+  flash(el.board, "view-in");
   el.input.focus();
 }
 
 function startSoloTimer() {
+  if (!timeEnabled()) { stopTimer(); return; }
   const limitMs = ruleLimitSec() * 1000;
   runTimer(Date.now() + limitMs, limitMs, Date.now, onSoloTimeout);
 }
@@ -180,12 +258,12 @@ function onSoloTimeout() {
 }
 
 function soloSubmit(word) {
-  if (state.over) return;
+  if (!state || state.over) return;
   const prev = state.words[state.words.length - 1];
   const opts = {};
-  if (el.dictToggle.checked) opts.isRealWord = isRealWord;
-  const min = soloMinLength();
-  if (min > 2) opts.minLength = min;
+  if (state.rule.dictCheck) opts.isRealWord = isRealWord;
+  if (state.rule.minLength > 2) opts.minLength = state.rule.minLength;
+  if (state.rule.exactLength) opts.exactLength = state.rule.exactLength;
 
   const result = judge(word, prev, state.used, opts);
 
@@ -222,7 +300,7 @@ function soloSubmit(word) {
 function soloEnd(result) {
   stopTimer();
   state.over = true;
-  saveGame(state.words, result);
+  saveGame(state.words, result, state.rule);
   renderSolo();
   renderHistory();
 }
@@ -233,24 +311,34 @@ function seatOf(room, seat) {
   return Object.values(players).find((p) => p.seat === seat) || null;
 }
 
-/** 画面（ソロ盤面 / ロビー / 対戦盤面）の表示を一括制御する */
+/** 画面（ソロ設定 / ソロ盤面 / ロビー / 対戦盤面）の表示を一括制御する */
 function applyView() {
   const isOnline = mode === "online";
-  const inGame = isOnline && !!session;        // オンラインかつ入室中＝対戦画面
+  const onlineGame = isOnline && !!session;        // オンライン入室中＝対戦画面
+  const soloSetup = !isOnline && soloPhase === "setup";
+  const soloPlay = !isOnline && soloPhase === "play";
 
-  el.modeTabs.hidden = inGame;                 // 対戦中はモードタブを隠す
-  el.rules.hidden = inGame;                    // ルールは作成画面でのみ編集可
-  el.lobby.hidden = !isOnline || inGame;       // ロビーはオンラインの作成画面のみ
-  el.roomBanner.hidden = !inGame;
+  el.modeTabs.hidden = onlineGame;                 // オンライン対戦中のみタブを隠す
 
-  const showPlay = !isOnline || inGame;        // ソロ or 対戦中は盤面を表示
+  // ルール編集パネル: 設定中のみ表示（ソロ設定 or オンラインのロビー）
+  el.rules.hidden = !(soloSetup || (isOnline && !session));
+  // ソロ開始ボタン: ソロ設定中のみ
+  el.startActions.hidden = !soloSetup;
+
+  // オンラインのロビー / ルームバナー
+  el.lobby.hidden = !(isOnline && !session);
+  el.roomBanner.hidden = !onlineGame;
+
+  // 盤面（プレイ領域）: ソロ対戦中 or オンライン対戦中
+  const showPlay = soloPlay || onlineGame;
   el.board.hidden = !showPlay;
   el.form.hidden = !showPlay;
   el.chain.hidden = !showPlay;
   el.message.hidden = !showPlay;
 
-  el.resetBtn.hidden = isOnline;               // 「はじめから」はソロのみ
-  el.actions.hidden = isOnline;                // オンラインの操作列は決着時にrenderOnlineが開放
+  // 操作列（リセット/再戦）
+  el.resetBtn.hidden = isOnline;                   // 「はじめから」はソロのみ
+  el.actions.hidden = !soloPlay;                   // ソロ対戦中のみ表示。オンラインは決着時にrenderOnlineが開放
 }
 
 function updateModeTabs() {
@@ -284,8 +372,10 @@ function renderOnline(room) {
   }
 
   const words = room.words && room.words.length ? room.words : [room.starter];
-  const minLength = room.rule ? room.rule.minLength : 2;
-  renderBoard(words, minLength);
+  const l = room.rule
+    ? { minLength: room.rule.minLength, exactLength: room.rule.exactLength }
+    : {};
+  renderBoard(words, lengthHint(l));
 
   const myTurn = room.status === "playing" && room.turn === session.seat;
   el.input.disabled = !myTurn;
@@ -378,12 +468,7 @@ async function onCreateRoom() {
   el.createRoomBtn.disabled = true;
   el.lobbyMsg.textContent = "";
   try {
-    const rule = {
-      dictCheck: el.dictToggle.checked,
-      minLength: soloMinLength(),
-      limitSec: ruleLimitSec(),
-    };
-    const sess = await online.createRoom({ name: "ホスト", rule });
+    const sess = await online.createRoom({ name: "ホスト", rule: ruleSnapshot() });
     startSubscription(sess);
   } catch (e) {
     lobbyError(e.message || "ルーム作成に失敗しました");
@@ -468,8 +553,7 @@ function setMode(next) {
     flash(el.lobby, "view-in");
     ensureConfigured();
   } else {
-    applyView();
-    soloStart();
+    soloToSetup();
   }
 }
 
@@ -481,14 +565,14 @@ el.form.addEventListener("submit", (e) => {
   else onlineSubmit(word);
 });
 
-el.minLengthSelect.addEventListener("change", () => {
-  if (mode === "solo") renderRuleHint(soloMinLength());
+el.timeToggle.addEventListener("change", () => {
+  el.limitWrap.hidden = !el.timeToggle.checked; // ON時のみ解答時間UIを表示
 });
 el.limitInput.addEventListener("change", () => {
   el.limitInput.value = String(ruleLimitSec()); // 3〜100に丸めて表示も補正
-  if (mode === "solo" && state && !state.over) startSoloTimer();
 });
-el.resetBtn.addEventListener("click", soloStart);
+el.startBtn.addEventListener("click", soloBegin);
+el.resetBtn.addEventListener("click", soloToSetup);
 el.clearHistoryBtn.addEventListener("click", () => {
   clearHistory();
   renderHistory();
@@ -514,5 +598,4 @@ loadDictionary().then((ok) => {
 });
 
 renderHistory();
-applyView();
-soloStart();
+soloToSetup();

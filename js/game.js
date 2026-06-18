@@ -37,11 +37,15 @@ export function endsWithN(word) {
  * @param {object} [opts]
  * @param {(w:string)=>boolean} [opts.isRealWord] 指定時、実在語チェックを行う
  * @param {number} [opts.minLength] 指定時、この文字数以上の単語のみ許可（文字数しばり）
+ * @param {number} [opts.exactLength] 指定時、ちょうどこの文字数の単語のみ許可（3文字縛り等）
  * @returns {{ok:boolean, reason?:string, end?:"win"|"lose"}}
  */
 export function judge(word, prevWord, usedSet, opts = {}) {
   if (!isValidInput(word)) {
     return { ok: false, reason: "ひらがな2文字以上で入力してね" };
+  }
+  if (opts.exactLength && word.length !== opts.exactLength) {
+    return { ok: false, reason: `ちょうど${opts.exactLength}文字で入力してね（${opts.exactLength}文字縛り）` };
   }
   if (opts.minLength && word.length < opts.minLength) {
     return { ok: false, reason: `${opts.minLength}文字以上で入力してね（文字数しばり）` };

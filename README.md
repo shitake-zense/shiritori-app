@@ -28,28 +28,36 @@
 | ひらがなバリデーション | ひらがな（長音符含む）2文字以上のみ受付 |
 | ランダム初期単語 | ゲーム開始時に初期単語を自動選択 |
 | 対戦中の単語チェーン表示 | その対戦でつないだ単語を一覧表示 |
-| 履歴の保存・一覧 | 過去のゲーム結果を localStorage に保存（最大20件・新しい順）。クリア可能 |
+| 連続成功カウント | 何回続けてつなげているかを盤面に表示 |
+| 履歴の保存・一覧 | 過去のゲーム結果を localStorage に保存（最大20件・新しい順）。**そのときのルール設定も併記**。クリア可能 |
 | 単語チェックモード | ON にすると約45,000語の辞書に存在する実在単語のみ許可（IPAdic 由来） |
-| **文字数しばり** | 独自ルール。N文字以上（3〜5）の単語のみ許可するモードを選択可能 |
+| **文字数しばり** | 独自ルール。「ちょうど3文字」または「N文字以上（3〜5）」を選択可能 |
+| **解答時間制限** | ON/OFF切替（既定OFF）。ONで解答時間を入力（3〜100秒）。時間切れでその手番のプレイヤーが負け |
+| 開始ボタン・ルール固定 | ルールを設定して「しりとりを始める」で開始。開始後はルール変更不可 |
+| **オンライン対戦** | ルームコード方式の2人対戦（Firebase Realtime Database）。手番・勝敗・時間制限をリアルタイム同期 |
 
 ## 技術構成
 
 - **Vanilla JS（ES モジュール）** + プレーン CSS。ビルド・パッケージマネージャ・依存関係なし。
-- **GitHub Pages** で配信。
-- ロジックと DOM を意図的に分離し、将来の複数人対戦への拡張を見据えた構成にしています。
+- オンライン対戦のみ **Firebase Realtime Database** を CDN から ES モジュールで読み込み。
+- **GitHub Pages** で配信。和モダン（墨×朱×和紙）のデザイン（Webフォント: Shippori Mincho B1 / Zen Kaku Gothic New）。
+- ロジックと DOM を意図的に分離。この分離のおかげでオンライン対戦（online.js）を後付けで重ねられました。
 
 ```
-index.html          単一画面UI
-css/style.css        ミニマルなカードデザイン
+index.html          UI（ソロ設定/盤面・オンライン作成/対戦を画面切替）
+css/style.css        和モダンのスタイル
 js/game.js           DOM非依存の純粋ロジック（文字正規化・判定 judge()）
-js/main.js           DOM制御とゲーム進行（状態管理・描画）
-js/history.js        履歴の localStorage 永続化
+js/main.js           DOM制御とゲーム進行（ソロ/オンライン2モード・画面制御 applyView）
+js/online.js         オンライン対戦ロジック（Firebase RTDB・ルーム同期・権威判定）
+js/firebase-config.js  Firebase設定（databaseURL 必須）
+js/history.js        履歴の localStorage 永続化（ルール設定も保存）
 js/dictionary.js     初期単語・辞書ロジック（words.json を非同期ロード）
 words.json           単語チェック用辞書（約45,000語）
 tools/build-dictionary.mjs  IPAdic から words.json を生成するスクリプト
+docs/FIREBASE.md     オンライン対戦のFirebase設定手順
 ```
 
-判定の中心は `game.js` の `judge()` で、戻り値 `{ ok, reason?, end? }` を軸に状態遷移します（`end: "lose"` =「ん」終了・重複による敗北。文字数しばり等の違反は `ok: false` の再入力要求として返す）。ルール追加はこの契約を保って `game.js` に集約しています。
+判定の中心は `game.js` の `judge()` で、戻り値 `{ ok, reason?, end? }` を軸に状態遷移します（`end: "lose"` =「ん」終了・重複による敗北。文字数しばり等の違反は `ok: false` の再入力要求として返す）。オンラインでも同じ `judge()` を transaction 内で権威評価するため、ルールは1か所（game.js）に集約されます。
 
 ## ローカルでの実行
 
@@ -62,6 +70,12 @@ tools/build-dictionary.mjs  IPAdic から words.json を生成するスクリプ
 python -m http.server 8000
 # → http://localhost:8000/ を開く
 ```
+
+## オンライン対戦
+
+ルームコード方式の2人対戦です。片方が「ルームを作る」でコードを発行し、もう片方がそのコードで参加します。手番・勝敗・解答時間はリアルタイムに同期されます。
+
+利用には Firebase（Realtime Database）の設定が必要です。手順は [`docs/FIREBASE.md`](docs/FIREBASE.md) を参照してください。未設定でも**ひとりプレイは動作します**。
 
 ## デプロイ
 
