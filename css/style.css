@@ -21,11 +21,17 @@
 [hidden] { display: none !important; }
 .view-in { animation: rise 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 
+html { max-width: 100%; overflow-x: hidden; }
+
 body {
   margin: 0;
   min-height: 100vh;
-  display: grid;
-  place-items: center;
+  max-width: 100%;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;       /* 横中央 */
+  justify-content: flex-start;/* 上揃え（縦中央だと縦長時に上が切れる） */
   padding: 32px 16px;
   background:
     radial-gradient(120% 80% at 50% -10%, #f6f1e6 0%, var(--washi) 55%, var(--washi-deep) 100%);
@@ -49,6 +55,7 @@ body {
   position: relative;
   z-index: 1;
   width: min(460px, 100%);
+  max-width: 100%;
   padding: 40px 34px 30px;
   background: var(--card);
   border: 1px solid var(--line);
@@ -162,8 +169,9 @@ body {
 /* ── ルーム情報バナー ─────────────────────────── */
 .room {
   display: flex;
+  flex-wrap: wrap;          /* 狭い画面では折返す */
   align-items: center;
-  gap: 14px;
+  gap: 8px 14px;
   margin-bottom: 18px;
   padding: 12px 16px;
   background: var(--sumi);
@@ -179,7 +187,7 @@ body {
   letter-spacing: 0.3em;
   color: #fff;
 }
-.room__status { flex: 1; margin: 0; font-size: 0.82rem; letter-spacing: 0.05em; }
+.room__status { flex: 1; min-width: 0; margin: 0; font-size: 0.82rem; letter-spacing: 0.05em; }
 .room .btn--text { color: rgba(243, 237, 224, 0.7); }
 .room .btn--text:hover { color: #fff; }
 
@@ -312,6 +320,7 @@ body {
 .input { display: flex; gap: 10px; margin-bottom: 14px; }
 .input__field {
   flex: 1;
+  min-width: 0;            /* flex内で縮小可にし溢れを防ぐ */
   padding: 13px 15px;
   font: inherit;
   font-size: 1.05rem;
@@ -436,10 +445,14 @@ body {
 }
 
 @media (max-width: 420px) {
-  .app { padding: 30px 20px 24px; }
-  .masthead__title { font-size: 2.4rem; }
-  .board__word { font-size: 2.2rem; }
-  .input__submit { padding: 13px 16px; }
+  body { padding: 20px 12px; }
+  .app { padding: 28px 18px 22px; }
+  .masthead__title { font-size: 2.3rem; letter-spacing: 0.1em; }
+  .masthead__kicker { letter-spacing: 0.28em; }
+  .board__word { font-size: 2rem; }
+  .room__code { letter-spacing: 0.2em; }
+  .input__submit, .btn { padding: 13px 14px; }
+  .lobby__join .input__field { letter-spacing: 0.15em; }
 }
 
 @media (prefers-reduced-motion: reduce) {
