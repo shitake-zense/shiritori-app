@@ -43,6 +43,12 @@
             <option value="5">5字以上</option>
           </select>
         </label>
+        <label class="select">
+          <span>解答時間</span>
+          <input class="select__num" id="limitInput" type="number"
+                 min="3" max="100" step="1" value="10" inputmode="numeric" />
+          <span class="select__unit">秒</span>
+        </label>
       </div>
     </section>
 
@@ -75,6 +81,10 @@
         <span class="seal__char" id="nextChar">―</span>
       </div>
       <p class="board__rule" id="ruleHint" hidden></p>
+      <div class="timer" id="timer" hidden aria-hidden="true">
+        <div class="timer__track"><div class="timer__bar" id="timerBar"></div></div>
+        <span class="timer__num" id="timerNum">10</span>
+      </div>
     </section>
 
     <form class="input" id="wordForm" autocomplete="off">

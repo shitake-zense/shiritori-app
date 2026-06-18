@@ -244,6 +244,18 @@ body {
   cursor: pointer;
 }
 .select select:focus-visible { outline: 2px solid var(--shu); outline-offset: 1px; }
+.select__num {
+  width: 3.5em;
+  font: inherit;
+  color: var(--sumi);
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--card);
+  text-align: center;
+}
+.select__num:focus-visible { outline: 2px solid var(--shu); outline-offset: 1px; }
+.select__unit { font-size: 0.78rem; color: var(--muted); margin-left: -2px; }
 
 /* ── 盤面 ─────────────────────────────────────── */
 .board {
@@ -310,6 +322,40 @@ body {
   font-weight: 700;
   letter-spacing: 0.08em;
 }
+
+/* カウントダウン（解答時間） */
+.timer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 18px auto 0;
+  max-width: 240px;
+}
+.timer__track {
+  flex: 1;
+  height: 6px;
+  background: var(--washi-deep);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.timer__bar {
+  height: 100%;
+  width: 100%;
+  background: var(--shu);
+  border-radius: 999px;
+  transition: width 0.12s linear;
+}
+.timer__num {
+  font-family: var(--serif);
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--sumi-soft);
+  min-width: 1.6em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.timer.is-low .timer__bar { background: var(--shu-deep); }
+.timer.is-low .timer__num { color: var(--shu); animation: pulse 0.8s ease-in-out infinite; }
 
 /* 勝敗・入力フィードバックの演出 */
 .board.is-ok .seal { animation: pop 0.4s cubic-bezier(0.2, 1.4, 0.4, 1); }
@@ -442,6 +488,10 @@ body {
   40% { transform: translateX(6px); }
   60% { transform: translateX(-4px); }
   80% { transform: translateX(3px); }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 @media (max-width: 420px) {

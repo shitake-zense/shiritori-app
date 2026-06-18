@@ -19,7 +19,11 @@ const el = {
   clearHistoryBtn: document.getElementById("clearHistoryBtn"),
   dictToggle: document.getElementById("dictToggle"),
   minLengthSelect: document.getElementById("minLengthSelect"),
+  limitInput: document.getElementById("limitInput"),
   ruleHint: document.getElementById("ruleHint"),
+  timer: document.getElementById("timer"),
+  timerBar: document.getElementById("timerBar"),
+  timerNum: document.getElementById("timerNum"),
   // モード・オンライン
   modeTabs: document.getElementById("modeTabs"),
   modeSolo: document.getElementById("modeSolo"),
@@ -42,6 +46,44 @@ let state;                // ソロ用の状態
 let session = null;       // { code, playerId, seat }
 let unsub = null;         // ルーム購読解除関数
 let lastRoom = null;      // 直近のルームスナップショット（差分検知用）
+
+let timerId = null;       // カウントダウンの interval
+
+/** 解答時間（秒）。入力値を3〜100に丸める（既定10） */
+function ruleLimitSec() {
+  let v = parseInt(el.limitInput.value, 10);
+  if (isNaN(v)) v = 10;
+  return Math.max(3, Math.min(100, v));
+}
+
+function stopTimer() {
+  if (timerId) { clearInterval(timerId); timerId = null; }
+  el.timer.hidden = true;
+  el.timer.classList.remove("is-low");
+}
+
+function paintTimer(remainMs, limitMs) {
+  const remain = Math.max(0, remainMs);
+  el.timer.hidden = false;
+  el.timerNum.textContent = String(Math.ceil(remain / 1000));
+  el.timerBar.style.width = `${Math.max(0, Math.min(100, (remain / limitMs) * 100))}%`;
+  el.timer.classList.toggle("is-low", remain <= 3000);
+}
+
+/** 共通カウントダウン。deadlineを過ぎたら onExpire を呼ぶ。nowFnでサーバ/ローカル時刻を切替 */
+function runTimer(deadline, limitMs, nowFn, onExpire) {
+  stopTimer();
+  const tick = () => {
+    const remain = deadline - nowFn();
+    paintTimer(remain, limitMs);
+    if (remain <= 0) {
+      if (timerId) { clearInterval(timerId); timerId = null; }
+      onExpire();
+    }
+  };
+  tick();
+  timerId = setInterval(tick, 100);
+}
 
 // ───────── 共通描画 ─────────
 function renderBoard(words, minLength) {
@@ -121,7 +163,20 @@ function soloStart() {
   setMessage("");
   el.input.value = "";
   renderSolo();
+  startSoloTimer();
   el.input.focus();
+}
+
+function startSoloTimer() {
+  const limitMs = ruleLimitSec() * 1000;
+  runTimer(Date.now() + limitMs, limitMs, Date.now, onSoloTimeout);
+}
+
+function onSoloTimeout() {
+  if (!state || state.over) return;
+  soloEnd("lose");
+  setMessage("時間切れ！あなたの負け", "lose");
+  flash(el.board, "is-lose");
 }
 
 function soloSubmit(word) {
@@ -159,11 +214,13 @@ function soloSubmit(word) {
     setMessage("よし、次へ", "ok");
     renderSolo();
     flash(el.board, "is-ok");
+    startSoloTimer(); // 次の手番のタイマーを再起動
   }
   el.input.focus();
 }
 
 function soloEnd(result) {
+  stopTimer();
   state.over = true;
   saveGame(state.words, result);
   renderSolo();
@@ -220,6 +277,7 @@ function renderOnline(room) {
 
   if (!room) {
     setMessage("ルームが見つかりません（解散された可能性があります）", "error");
+    stopTimer();
     el.input.disabled = true;
     lastRoom = null;
     return;
@@ -244,6 +302,7 @@ function renderOnline(room) {
   if (room.status === "waiting") {
     el.roomStatus.textContent = "相手を待っています…";
     setMessage(`コード「${session.code}」を相手に共有してね（あなたは${seatLabel}）`, "");
+    stopTimer();
     el.actions.hidden = true;
     el.rematchBtn.hidden = true;
   } else if (room.status === "playing") {
@@ -257,13 +316,28 @@ function renderOnline(room) {
     } else {
       setMessage("相手の入力を待っています…", "");
     }
+    // 共有期限でカウントダウン。期限超過でtransaction決着（手番者の負け）。
+    if (room.rule && room.rule.limitSec && typeof room.turnStartedAt === "number") {
+      const limitMs = room.rule.limitSec * 1000;
+      const startedAt = room.turnStartedAt;
+      runTimer(startedAt + limitMs, limitMs, online.serverNow,
+        () => online.timeoutLose(session.code, startedAt));
+    } else {
+      stopTimer();
+    }
     el.actions.hidden = true;
     el.rematchBtn.hidden = true;
   } else if (room.status === "over") {
     const iLost = room.loser === session.seat;
+    const timeout = room.endReason === "timeout";
     el.roomStatus.textContent = iLost ? "敗北" : "勝利";
-    setMessage(iLost ? "あなたの負け…" : "あなたの勝ち！", iLost ? "lose" : "win");
+    setMessage(
+      iLost ? (timeout ? "時間切れ…あなたの負け" : "あなたの負け…")
+            : (timeout ? "相手が時間切れ！あなたの勝ち" : "あなたの勝ち！"),
+      iLost ? "lose" : "win"
+    );
     if (iLost) flash(el.board, "is-lose");
+    stopTimer();
     el.input.disabled = true;
     el.actions.hidden = false;                 // 決着時のみ操作列を表示
     el.rematchBtn.hidden = false;
@@ -307,6 +381,7 @@ async function onCreateRoom() {
     const rule = {
       dictCheck: el.dictToggle.checked,
       minLength: soloMinLength(),
+      limitSec: ruleLimitSec(),
     };
     const sess = await online.createRoom({ name: "ホスト", rule });
     startSubscription(sess);
@@ -336,6 +411,7 @@ async function onLeaveRoom() {
   if (session) await online.leaveRoom(session);
   session = null;
   lastRoom = null;
+  stopTimer();
   el.rematchBtn.hidden = true;
   el.lobbyMsg.textContent = "";
   el.roomCodeInput.value = "";
@@ -380,6 +456,7 @@ function setMode(next) {
   mode = next;
   updateModeTabs();
   el.rematchBtn.hidden = true;
+  stopTimer();
 
   if (next === "online") {
     setMessage("");
@@ -406,6 +483,10 @@ el.form.addEventListener("submit", (e) => {
 
 el.minLengthSelect.addEventListener("change", () => {
   if (mode === "solo") renderRuleHint(soloMinLength());
+});
+el.limitInput.addEventListener("change", () => {
+  el.limitInput.value = String(ruleLimitSec()); // 3〜100に丸めて表示も補正
+  if (mode === "solo" && state && !state.over) startSoloTimer();
 });
 el.resetBtn.addEventListener("click", soloStart);
 el.clearHistoryBtn.addEventListener("click", () => {

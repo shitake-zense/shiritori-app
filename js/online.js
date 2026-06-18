@@ -25,6 +25,7 @@ import { judge } from "./game.js";
 import { randomStarter, isRealWord } from "./dictionary.js";
 
 let db = null;
+let serverOffset = 0; // サーバ時刻 - クライアント時刻（ミリ秒）
 
 /** Firebaseを初期化（未設定なら例外）。複数回呼んでも安全。 */
 export function initOnline() {
@@ -34,7 +35,23 @@ export function initOnline() {
   }
   const app = initializeApp(firebaseConfig);
   db = getDatabase(app);
+  // クライアント時計の補正値を購読（タイムアウト期限の同期に使う）
+  onValue(ref(db, ".info/serverTimeOffset"), (s) => {
+    serverOffset = s.val() || 0;
+  });
   return db;
+}
+
+/** サーバ基準の現在時刻（ミリ秒）。タイムアウト判定はこれを使う。 */
+export function serverNow() {
+  return Date.now() + serverOffset;
+}
+
+/** 制限時間を 3〜100 秒に丸める（既定10秒） */
+export function clampLimit(v) {
+  v = Number(v);
+  if (!Number.isFinite(v)) v = 10;
+  return Math.max(3, Math.min(100, Math.round(v)));
 }
 
 // 紛らわしい文字(I/O/0/1)を除いたルームコード用文字種
@@ -65,6 +82,7 @@ export async function createRoom({ name, rule } = {}) {
   const safeRule = {
     dictCheck: !!(rule && rule.dictCheck),
     minLength: (rule && rule.minLength) || 2,
+    limitSec: clampLimit(rule && rule.limitSec),
   };
 
   for (let attempt = 0; attempt < 5; attempt++) {
@@ -80,6 +98,8 @@ export async function createRoom({ name, rule } = {}) {
       words: [starter],
       turn: 0,
       loser: null,
+      endReason: null,
+      turnStartedAt: null, // 対戦開始(参加)時にサーバ時刻で設定する
       players: { [playerId]: { name: name || "ホスト", seat: 0, online: true } },
     });
     setupPresence(code, playerId);
@@ -109,7 +129,8 @@ export async function joinRoom({ code, name } = {}) {
   await update(ref(db, `rooms/${code}/players/${playerId}`), {
     name: name || "ゲスト", seat: 1, online: true,
   });
-  await update(roomRef, { status: "playing" });
+  // 対戦開始。先攻(seat0)の手番開始時刻をサーバ時刻で記録（タイムアウト基準）。
+  await update(roomRef, { status: "playing", turnStartedAt: serverTimestamp() });
   setupPresence(code, playerId);
   return { code, playerId, seat: 1 };
 }
@@ -162,12 +183,32 @@ export async function submitWord({ code, seat }, word) {
     if (res.end === "lose") {
       room.status = "over";
       room.loser = seat;
+      room.endReason = "rule"; // 「ん」終了・重複
     } else {
       room.turn = 1 - seat;
+      room.turnStartedAt = serverTimestamp(); // 次の手番のタイマーを起動
     }
     return room;
   });
   return outcome;
+}
+
+/**
+ * 制限時間切れによる敗北を確定する。手番のプレイヤー(room.turn)が負け。
+ * 両クライアントが同時に呼んでも transaction で冪等（後勝ちしない）。
+ * @param {number} expectedTurnStartedAt 期限算出に使った手番開始時刻。ズレていたら無効化。
+ */
+export async function timeoutLose(code, expectedTurnStartedAt) {
+  initOnline();
+  await runTransaction(ref(db, `rooms/${code}`), (room) => {
+    if (!room || room.status !== "playing") return room;
+    // 別の手番に移っている／開始時刻が異なる場合は誤発火なので何もしない
+    if (room.turnStartedAt !== expectedTurnStartedAt) return room;
+    room.status = "over";
+    room.loser = room.turn;
+    room.endReason = "timeout";
+    return room;
+  });
 }
 
 /** 同じルームで再戦（状態を初期化） */
@@ -175,7 +216,8 @@ export async function rematch(code) {
   initOnline();
   const starter = randomStarter();
   await update(ref(db, `rooms/${code}`), {
-    status: "playing", words: [starter], starter, turn: 0, loser: null,
+    status: "playing", words: [starter], starter, turn: 0,
+    loser: null, endReason: null, turnStartedAt: serverTimestamp(),
   });
 }
 
