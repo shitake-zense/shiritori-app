@@ -2,13 +2,16 @@
 // Firebase Realtime Database でルーム状態を同期する。ルームコード方式。
 //
 // ルームのデータ構造（rooms/{code}）:
-//   status   : "waiting" | "playing" | "over"
-//   rule     : { dictCheck: bool, minLength: number }
-//   starter  : string          初期単語
-//   words    : string[]        つないだ単語列（words[0] が starter）
-//   turn     : 0 | 1           次に打つ席(seat)
-//   loser    : 0 | 1 | null    敗者の席
-//   players  : { [playerId]: { name, seat: 0|1, online: bool } }
+//   status    : "waiting" | "playing" | "over"
+//   rule      : { mode: "normal"|"atama"|"sugi", dictCheck, minLength, exactLength, limitSec, maxTurns }
+//   starter   : string          初期単語
+//   words     : string[]        つないだ単語列（words[0] が starter）
+//   turn      : 0 | 1           次に打つ席(seat)
+//   loser     : 0 | 1 | null    敗者の席（null=引き分け/未決着）
+//   endReason : "rule"|"timeout"|"turns"|null  決着理由
+//   scores    : { 0:number, 1:number }   しりとりすぎの席別得点
+//   turnCount : number          継いだ回数（最大ターン判定）
+//   players   : { [playerId]: { name, seat: 0|1, online: bool } }
 //
 // 勝敗・接続判定は game.js の judge() を権威として transaction 内で再評価する。
 
@@ -54,6 +57,13 @@ export function clampLimit(v) {
   return Math.max(3, Math.min(100, Math.round(v)));
 }
 
+/** しりとりすぎの最大ターン数を 2〜99 に丸める（既定12） */
+export function clampTurns(v) {
+  v = Number(v);
+  if (!Number.isFinite(v)) v = 12;
+  return Math.max(2, Math.min(99, Math.round(v)));
+}
+
 // 紛らわしい文字(I/O/0/1)を除いたルームコード用文字種
 const CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 function makeCode(len = 4) {
@@ -79,11 +89,14 @@ export async function createRoom({ name, rule } = {}) {
   initOnline();
   const playerId = crypto.randomUUID();
   const starter = randomStarter();
+  const m = rule && (rule.mode === "atama" || rule.mode === "sugi") ? rule.mode : "normal";
   const safeRule = {
+    mode: m, // 遊び方（normal/atama/sugi）
     dictCheck: !!(rule && rule.dictCheck),
     minLength: (rule && rule.minLength) || 2,
     exactLength: (rule && rule.exactLength) || 0,
     limitSec: rule && rule.limitSec ? clampLimit(rule.limitSec) : 0, // 0=制限なし
+    maxTurns: m === "sugi" ? clampTurns(rule && rule.maxTurns) : 0,   // しりとりすぎの最大ターン
   };
 
   for (let attempt = 0; attempt < 5; attempt++) {
@@ -101,6 +114,8 @@ export async function createRoom({ name, rule } = {}) {
       loser: null,
       endReason: null,
       turnStartedAt: null, // 対戦開始(参加)時にサーバ時刻で設定する
+      scores: { 0: 0, 1: 0 }, // しりとりすぎの席別得点
+      turnCount: 0,           // 継いだ回数（最大ターン判定用）
       players: { [playerId]: { name: name || "ホスト", seat: 0, online: true } },
     });
     setupPresence(code, playerId);
@@ -170,6 +185,7 @@ export async function submitWord({ code, seat }, word) {
     const used = new Set(words);
 
     const opts = {};
+    if (room.rule && room.rule.mode === "atama") opts.mode = "atama";
     if (room.rule && room.rule.dictCheck) opts.isRealWord = isRealWord;
     if (room.rule && room.rule.minLength > 2) opts.minLength = room.rule.minLength;
     if (room.rule && room.rule.exactLength) opts.exactLength = room.rule.exactLength;
@@ -185,7 +201,23 @@ export async function submitWord({ code, seat }, word) {
     if (res.end === "lose") {
       room.status = "over";
       room.loser = seat;
-      room.endReason = "rule"; // 「ん」終了・重複
+      room.endReason = "rule"; // 「ん」終了・重複（点数に関係なく即負け）
+    } else if (room.rule && room.rule.mode === "sugi") {
+      // しりとりすぎ: 重なり長を加点し、最大ターン到達で点数勝負
+      const scores = room.scores || { 0: 0, 1: 0 };
+      scores[seat] = (scores[seat] || 0) + (res.points || 0);
+      room.scores = scores;
+      const tc = (room.turnCount || 0) + 1;
+      room.turnCount = tc;
+      if (room.rule.maxTurns && tc >= room.rule.maxTurns) {
+        room.status = "over";
+        room.endReason = "turns";
+        const s0 = scores[0] || 0, s1 = scores[1] || 0;
+        room.loser = s0 === s1 ? null : (s0 < s1 ? 0 : 1); // 低い方が負け・同点は引き分け(null)
+      } else {
+        room.turn = 1 - seat;
+        room.turnStartedAt = serverTimestamp();
+      }
     } else {
       room.turn = 1 - seat;
       room.turnStartedAt = serverTimestamp(); // 次の手番のタイマーを起動
@@ -220,6 +252,7 @@ export async function rematch(code) {
   await update(ref(db, `rooms/${code}`), {
     status: "playing", words: [starter], starter, turn: 0,
     loser: null, endReason: null, turnStartedAt: serverTimestamp(),
+    scores: { 0: 0, 1: 0 }, turnCount: 0, // しりとりすぎの得点・ターンもリセット
   });
 }
 

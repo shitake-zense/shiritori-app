@@ -1,5 +1,5 @@
 // DOM制御とゲーム進行。ソロ／オンライン対戦の2モードを切り替える。
-import { judge, lastChar } from "./game.js";
+import { judge, lastChar, firstChar } from "./game.js";
 import { randomStarter, isRealWord, loadDictionary } from "./dictionary.js";
 import { loadHistory, saveGame, clearHistory } from "./history.js";
 import { isConfigured } from "./firebase-config.js";
@@ -18,7 +18,12 @@ const el = {
   historyList: document.getElementById("historyList"),
   clearHistoryBtn: document.getElementById("clearHistoryBtn"),
   dictToggle: document.getElementById("dictToggle"),
+  ruleMode: document.getElementById("ruleMode"),
+  turnsWrap: document.getElementById("turnsWrap"),
+  turnsInput: document.getElementById("turnsInput"),
   lengthSelect: document.getElementById("lengthSelect"),
+  sealLabel: document.getElementById("sealLabel"),
+  score: document.getElementById("score"),
   timeToggle: document.getElementById("timeToggle"),
   limitWrap: document.getElementById("limitWrap"),
   limitInput: document.getElementById("limitInput"),
@@ -67,6 +72,13 @@ function timeEnabled() {
   return el.timeToggle.checked;
 }
 
+/** しりとりすぎの最大ターン数。入力値を2〜99に丸める（既定12） */
+function ruleMaxTurns() {
+  let v = parseInt(el.turnsInput.value, 10);
+  if (isNaN(v)) v = 12;
+  return Math.max(2, Math.min(99, v));
+}
+
 /** 文字数しばりの選択値を {minLength?} / {exactLength?} に変換 */
 function soloLength() {
   const v = el.lengthSelect.value;
@@ -75,21 +87,42 @@ function soloLength() {
   return {};
 }
 
-/** しばりの表示文字列（盤面バッジ用） */
-function lengthHint(l) {
-  if (l && l.exactLength) return `ちょうど${l.exactLength}文字`;
-  if (l && l.minLength > 2) return `${l.minLength}文字以上`;
+/** 文字数しばりの表示文字列 */
+function lengthHint(rule) {
+  if (rule && rule.exactLength) return `ちょうど${rule.exactLength}文字`;
+  if (rule && rule.minLength > 2) return `${rule.minLength}文字以上`;
   return "";
+}
+
+/** 遊び方ラベル（normal は表示なし） */
+function modeLabel(rule) {
+  if (rule && rule.mode === "atama") return "あたまとり";
+  if (rule && rule.mode === "sugi") return "しりとりすぎ";
+  return "";
+}
+
+/** 盤面バッジ用の文字列（遊び方＋文字数しばりを結合） */
+function boardHint(rule) {
+  const p = [];
+  const m = modeLabel(rule);
+  if (m) p.push(m);
+  const l = lengthHint(rule);
+  if (l) p.push(l);
+  return p.join("・");
 }
 
 /** 現在のルール設定のスナップショット（履歴保存・ルーム作成で共用） */
 function ruleSnapshot() {
   const l = soloLength();
+  const m = el.ruleMode.value;
+  const mode = (m === "atama" || m === "sugi") ? m : "normal";
   return {
+    mode,
     dictCheck: el.dictToggle.checked,
     minLength: l.minLength || 0,
     exactLength: l.exactLength || 0,
     limitSec: timeEnabled() ? ruleLimitSec() : 0,
+    maxTurns: mode === "sugi" ? ruleMaxTurns() : 0,
   };
 }
 
@@ -97,6 +130,9 @@ function ruleSnapshot() {
 function ruleSummary(rule) {
   if (!rule) return "通常ルール";
   const p = [];
+  const m = modeLabel(rule);
+  if (m) p.push(m);
+  if (rule.mode === "sugi" && rule.maxTurns) p.push(`${rule.maxTurns}手`);
   if (rule.dictCheck) p.push("辞書チェック");
   if (rule.exactLength) p.push(`${rule.exactLength}文字ちょうど`);
   else if (rule.minLength > 2) p.push(`${rule.minLength}字以上`);
@@ -134,13 +170,26 @@ function runTimer(deadline, limitMs, nowFn, onExpire) {
 }
 
 // ───────── 共通描画 ─────────
-function renderBoard(words, hint) {
+function renderBoard(words, hint, mode = "normal") {
   const prev = words[words.length - 1];
+  const atama = mode === "atama";
+  const sugi = mode === "sugi";
   el.currentWord.textContent = prev ?? "―";
-  el.nextChar.textContent = prev ? lastChar(prev) : "―";
+  // あたまとり: 次語は前語の「先頭文字」で終わる / しりとりすぎ: 末尾を重ねる / 通常: 末尾文字で始まる
+  el.sealLabel.textContent = atama ? "末尾" : sugi ? "重ね" : "次";
+  el.nextChar.textContent = prev ? (atama ? firstChar(prev) : lastChar(prev)) : "―";
   renderRuleHint(hint);
-  renderStreak(words);
+  // しりとりすぎは連続数の代わりにスコア表示を使う（caller が描画）
+  if (sugi) el.streak.hidden = true;
+  else renderStreak(words);
   renderChain(words);
+}
+
+/** しりとりすぎのスコア行を描画（text=null で非表示） */
+function renderScore(text) {
+  if (text == null) { el.score.hidden = true; return; }
+  el.score.textContent = text;
+  el.score.hidden = false;
 }
 
 function renderRuleHint(hint) {
@@ -196,11 +245,18 @@ function renderHistory() {
     const li = document.createElement("li");
     li.className = "history__item";
     // オンライン対戦のみ自分視点の勝敗バッジを出す（ソロは相手不在のため出さない）
-    const badge = g.mode === "online"
-      ? `<span class="history__result history__result--${g.result === "win" ? "win" : "lose"}">${g.result === "win" ? "勝" : "敗"}</span>`
-      : "";
+    let badge = "";
+    if (g.mode === "online") {
+      const r = g.result;
+      const label = r === "win" ? "勝" : r === "draw" ? "分" : "敗";
+      const cls = r === "win" ? "win" : r === "draw" ? "draw" : "lose";
+      badge = `<span class="history__result history__result--${cls}">${label}</span>`;
+    }
+    // しりとりすぎは得点を併記
+    const scoreText = (g.rule && g.rule.mode === "sugi" && typeof g.score === "number")
+      ? `・${g.score}点` : "";
     li.innerHTML =
-      `<span class="history__meta">${badge}${g.date}・${g.length}語</span>` +
+      `<span class="history__meta">${badge}${g.date}・${g.length}語${scoreText}</span>` +
       `<span class="history__rule">${ruleSummary(g.rule)}</span>` +
       `<span class="history__words">${g.words.join(" → ")}</span>`;
     el.historyList.appendChild(li);
@@ -210,12 +266,18 @@ function renderHistory() {
 // ───────── ソロモード ─────────
 function newState() {
   const starter = randomStarter();
-  return { words: [starter], used: new Set([starter]), over: false };
+  return { words: [starter], used: new Set([starter]), over: false, score: 0, turns: 0 };
 }
 
 function renderSolo() {
-  renderBoard(state.words, lengthHint(soloLength()));
+  renderBoard(state.words, boardHint(state.rule), state.rule.mode);
   el.input.disabled = state.over;
+  if (state.rule.mode === "sugi") {
+    const cap = state.rule.maxTurns ? `／${state.rule.maxTurns}` : "";
+    renderScore(`スコア ${state.score} 点 ・ ターン ${state.turns}${cap}`);
+  } else {
+    renderScore(null);
+  }
 }
 
 /** ルール設定画面（プレイ前）へ。ルールが編集可能になる。 */
@@ -227,9 +289,11 @@ function soloToSetup() {
   el.input.value = "";
   el.currentWord.textContent = "―";
   el.nextChar.textContent = "―";
+  el.sealLabel.textContent = "次";
   el.chain.innerHTML = "";
   el.ruleHint.hidden = true;
   el.streak.hidden = true;
+  renderScore(null);
   applyView();
   flash(el.rules, "view-in");
 }
@@ -265,6 +329,7 @@ function soloSubmit(word) {
   if (!state || state.over) return;
   const prev = state.words[state.words.length - 1];
   const opts = {};
+  if (state.rule.mode !== "normal") opts.mode = state.rule.mode;
   if (state.rule.dictCheck) opts.isRealWord = isRealWord;
   if (state.rule.minLength > 2) opts.minLength = state.rule.minLength;
   if (state.rule.exactLength) opts.exactLength = state.rule.exactLength;
@@ -293,7 +358,21 @@ function soloSubmit(word) {
     setMessage(result.reason, result.end);
     flash(el.board, "is-lose");
   } else {
-    setMessage("よし、次へ", "ok");
+    if (state.rule.mode === "sugi") {
+      state.score += result.points || 0;
+      state.turns += 1;
+      // 最大ターン到達でクリア（スコアアタック達成）
+      if (state.rule.maxTurns && state.turns >= state.rule.maxTurns) {
+        soloEnd("clear");
+        setMessage(`達成！最大ターン到達 — 最終スコア ${state.score} 点`, "win");
+        flash(el.board, "is-ok");
+        el.input.focus();
+        return;
+      }
+      setMessage(`+${result.points} 点（計 ${state.score} 点）`, "ok");
+    } else {
+      setMessage("よし、次へ", "ok");
+    }
     renderSolo();
     flash(el.board, "is-ok");
     startSoloTimer(); // 次の手番のタイマーを再起動
@@ -304,7 +383,8 @@ function soloSubmit(word) {
 function soloEnd(result) {
   stopTimer();
   state.over = true;
-  saveGame(state.words, result, state.rule);
+  const score = state.rule.mode === "sugi" ? state.score : undefined;
+  saveGame(state.words, result, state.rule, "solo", score);
   renderSolo();
   renderHistory();
 }
@@ -376,10 +456,20 @@ function renderOnline(room) {
   }
 
   const words = room.words && room.words.length ? room.words : [room.starter];
-  const l = room.rule
-    ? { minLength: room.rule.minLength, exactLength: room.rule.exactLength }
-    : {};
-  renderBoard(words, lengthHint(l));
+  const rule = room.rule || {};
+  renderBoard(words, boardHint(rule), rule.mode);
+
+  // しりとりすぎ: 双方の得点とターン数を表示
+  let mine = 0, theirs = 0;
+  if (rule.mode === "sugi") {
+    const sc = room.scores || {};
+    mine = sc[session.seat] || 0;
+    theirs = sc[1 - session.seat] || 0;
+    const cap = rule.maxTurns ? `／${rule.maxTurns}` : "";
+    renderScore(`あなた ${mine} 点 ・ 相手 ${theirs} 点 ・ ターン ${room.turnCount || 0}${cap}`);
+  } else {
+    renderScore(null);
+  }
 
   const myTurn = room.status === "playing" && room.turn === session.seat;
   el.input.disabled = !myTurn;
@@ -422,18 +512,24 @@ function renderOnline(room) {
     el.actions.hidden = true;
     el.rematchBtn.hidden = true;
   } else if (room.status === "over") {
+    const draw = room.loser == null;                 // 同点引き分け（loser未設定）
     const iLost = room.loser === session.seat;
     const timeout = room.endReason === "timeout";
+    const byTurns = room.endReason === "turns";       // 最大ターン到達で点数勝負
+    const pts = rule.mode === "sugi" ? `（あなた${mine}／相手${theirs}）` : "";
     // 決着への遷移を1度だけ履歴保存（自分視点の勝敗・ローカル保存）
     if (lastRoom && lastRoom.status !== "over") {
-      saveGame(room.words || words, iLost ? "lose" : "win", room.rule, "online");
+      const result = draw ? "draw" : iLost ? "lose" : "win";
+      const sc = rule.mode === "sugi" ? mine : undefined;
+      saveGame(room.words || words, result, room.rule, "online", sc);
       renderHistory();
     }
-    el.roomStatus.textContent = iLost ? "敗北" : "勝利";
+    el.roomStatus.textContent = draw ? "引き分け" : iLost ? "敗北" : "勝利";
     setMessage(
-      iLost ? (timeout ? "時間切れ…あなたの負け" : "あなたの負け…")
-            : (timeout ? "相手が時間切れ！あなたの勝ち" : "あなたの勝ち！"),
-      iLost ? "lose" : "win"
+      draw ? `引き分け！${pts}`
+        : iLost ? (timeout ? "時間切れ…あなたの負け" : byTurns ? `ポイント負け…${pts}` : "あなたの負け…")
+               : (timeout ? "相手が時間切れ！あなたの勝ち" : byTurns ? `ポイント勝ち！${pts}` : "あなたの勝ち！"),
+      draw ? "" : iLost ? "lose" : "win"
     );
     if (iLost) flash(el.board, "is-lose");
     stopTimer();
@@ -514,8 +610,11 @@ async function onLeaveRoom() {
   setMessage("");
   el.currentWord.textContent = "―";
   el.nextChar.textContent = "―";
+  el.sealLabel.textContent = "次";
   el.chain.innerHTML = "";
   el.ruleHint.hidden = true;
+  el.streak.hidden = true;
+  renderScore(null);
   applyView();                                 // 対戦画面 → ロビーへ遷移
   flash(el.lobby, "view-in");
 }
@@ -558,6 +657,8 @@ function setMode(next) {
     el.input.disabled = true;
     el.lobbyMsg.textContent = "";
     el.roomCodeInput.value = "";
+    el.streak.hidden = true;
+    renderScore(null);
     applyView();
     flash(el.lobby, "view-in");
     ensureConfigured();
@@ -579,6 +680,12 @@ el.timeToggle.addEventListener("change", () => {
 });
 el.limitInput.addEventListener("change", () => {
   el.limitInput.value = String(ruleLimitSec()); // 3〜100に丸めて表示も補正
+});
+el.ruleMode.addEventListener("change", () => {
+  el.turnsWrap.hidden = el.ruleMode.value !== "sugi"; // しりとりすぎ時のみ最大ターン入力
+});
+el.turnsInput.addEventListener("change", () => {
+  el.turnsInput.value = String(ruleMaxTurns()); // 2〜99に丸めて表示も補正
 });
 el.startBtn.addEventListener("click", soloBegin);
 el.resetBtn.addEventListener("click", soloToSetup);

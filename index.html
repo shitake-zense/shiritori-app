@@ -32,6 +32,20 @@
     <section class="rules" id="rules" aria-label="ルール設定">
       <p class="rules__head">ルール</p>
       <div class="rules__row">
+        <label class="select">
+          <span>遊び方</span>
+          <select id="ruleMode">
+            <option value="normal">しりとり（末尾→先頭）</option>
+            <option value="atama">あたまとり（先頭→末尾）</option>
+            <option value="sugi">しりとりすぎ（重なりで加点）</option>
+          </select>
+        </label>
+        <label class="select" id="turnsWrap" hidden>
+          <span>最大ターン</span>
+          <input class="select__num" id="turnsInput" type="number"
+                 min="2" max="99" step="1" value="12" inputmode="numeric" />
+          <span class="select__unit">手</span>
+        </label>
         <label class="toggle">
           <input type="checkbox" id="dictToggle" />
           <span>単語チェック（実在語のみ）</span>
@@ -89,7 +103,7 @@
       <p class="board__label">今の言葉</p>
       <p class="board__word" id="currentWord">―</p>
       <div class="seal" aria-hidden="true">
-        <span class="seal__label">次</span>
+        <span class="seal__label" id="sealLabel">次</span>
         <span class="seal__char" id="nextChar">―</span>
       </div>
       <p class="board__rule" id="ruleHint" hidden></p>
@@ -113,6 +127,8 @@
     <p class="message" id="message" role="status"></p>
 
     <p class="streak" id="streak" hidden></p>
+
+    <p class="score" id="score" hidden></p>
 
     <ol class="chain" id="chain" aria-label="この対戦の言葉のつながり"></ol>
 

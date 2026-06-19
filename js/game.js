@@ -33,12 +33,26 @@ export function endsWithN(word) {
 }
 
 /**
+ * しりとりすぎ用: 前の単語の末尾と次の単語の先頭が重なる最大文字数（1以上）。
+ * 重なりがなければ0。文字列の literal な一致で数える（得点＝この長さ）。
+ * 例: overlapLen("ごりら","りらっくす") = 2（"りら"）
+ */
+export function overlapLen(prevWord, word) {
+  const max = Math.min(prevWord.length, word.length);
+  for (let n = max; n >= 1; n--) {
+    if (prevWord.slice(-n) === word.slice(0, n)) return n;
+  }
+  return 0;
+}
+
+/**
  * 入力単語を判定する。
  * @param {object} [opts]
  * @param {(w:string)=>boolean} [opts.isRealWord] 指定時、実在語チェックを行う
  * @param {number} [opts.minLength] 指定時、この文字数以上の単語のみ許可（文字数しばり）
  * @param {number} [opts.exactLength] 指定時、ちょうどこの文字数の単語のみ許可（3文字縛り等）
- * @returns {{ok:boolean, reason?:string, end?:"win"|"lose"}}
+ * @param {"normal"|"atama"|"sugi"} [opts.mode] 接続方向。"atama"=あたまとり（次語の末尾が前語の先頭に一致）／"sugi"=しりとりすぎ（末尾と先頭の重なり1文字以上で接続し、重なり長を points で返す）。既定は通常しりとり
+ * @returns {{ok:boolean, reason?:string, end?:"win"|"lose", points?:number}}
  */
 export function judge(word, prevWord, usedSet, opts = {}) {
   if (!isValidInput(word)) {
@@ -56,11 +70,28 @@ export function judge(word, prevWord, usedSet, opts = {}) {
   if (usedSet.has(word)) {
     return { ok: false, end: "lose", reason: `「${word}」は既出！あなたの負け` };
   }
-  if (prevWord && firstChar(word) !== lastChar(prevWord)) {
-    return { ok: false, reason: `「${lastChar(prevWord)}」から始めてね` };
+  let points;
+  if (prevWord) {
+    if (opts.mode === "atama") {
+      // あたまとり: 次の単語の「末尾」が前の単語の「先頭」文字に一致する
+      if (lastChar(word) !== firstChar(prevWord)) {
+        return { ok: false, reason: `「${firstChar(prevWord)}」で終わる言葉を選んでね` };
+      }
+    } else if (opts.mode === "sugi") {
+      // しりとりすぎ: 前語の末尾と次語の先頭が重なれば接続（重なり長＝得点）
+      points = overlapLen(prevWord, word);
+      if (points < 1) {
+        return { ok: false, reason: `前の言葉の終わりと重なる文字から始めてね` };
+      }
+    } else {
+      // 通常しりとり: 次の単語の「先頭」が前の単語の「末尾」文字に一致する
+      if (firstChar(word) !== lastChar(prevWord)) {
+        return { ok: false, reason: `「${lastChar(prevWord)}」から始めてね` };
+      }
+    }
   }
   if (endsWithN(word)) {
     return { ok: true, end: "lose", reason: `「ん」で終了！あなたの負け` };
   }
-  return { ok: true };
+  return points != null ? { ok: true, points } : { ok: true };
 }

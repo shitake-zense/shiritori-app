@@ -420,6 +420,15 @@ body {
   letter-spacing: 0.08em;
   color: var(--shu);
 }
+.score {
+  margin: 0 0 14px;
+  text-align: center;
+  font-family: var(--serif);
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.06em;
+  color: var(--sumi);
+}
 
 /* ── 言葉のつながり ───────────────────────────── */
 .chain {
@@ -490,6 +499,7 @@ body {
 }
 .history__result--win { color: #fff; background: var(--shu); }       /* 勝＝朱の判子 */
 .history__result--lose { color: var(--muted); border: 1px solid var(--washi-deep); } /* 敗＝かすれ */
+.history__result--draw { color: var(--sumi-soft); border: 1px solid var(--sumi-soft); } /* 分＝引き分け */
 .history__words { font-size: 0.85rem; word-break: break-all; color: var(--sumi-soft); }
 .history__empty { color: var(--muted); font-size: 0.85rem; padding: 8px 0; }
 
