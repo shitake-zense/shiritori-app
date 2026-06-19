@@ -30,9 +30,14 @@ jig.jp 2026 サマーインターン選考課題のしりとりアプリ。Vanil
 - `index.html` / `css/style.css` — UI。**和モダン（墨×朱×和紙）**エディトリアル。明朝(Shippori Mincho)見出し×ゴシック(Zen Kaku Gothic New)本文、判子モチーフ、グレイン、勝敗/入力アニメ（`prefers-reduced-motion`対応）。
 - `docs/FIREBASE.md` — Firebaseコンソール設定手順とDBセキュリティルール。
 
-`judge()` の戻り値 `{ok, reason?, end?}` が状態遷移の中心。`end` は `"lose"`（「ん」終了・重複）を表す。文字数しばり（`opts.minLength`/`opts.exactLength`）・辞書チェック（`opts.isRealWord`）等の違反は `ok:false`（`end`なし）の再入力要求。解答時間切れは judge 外（ソロはクライアントタイマー、オンラインは `online.timeoutLose()` の transaction）で敗北を確定する。新ルール追加時はこの契約を保つこと（online.jsの権威判定も同じ`judge()`を通すため自動で整合する）。
+`judge()` の戻り値 `{ok, reason?, end?, points?}` が状態遷移の中心。`end` は `"lose"`（「ん」終了・重複）を表す。文字数しばり（`opts.minLength`/`opts.exactLength`）・辞書チェック（`opts.isRealWord`）等の違反は `ok:false`（`end`なし）の再入力要求。接続方向は `opts.mode`:
+- 既定（通常しりとり）: 次語の先頭が前語の末尾に一致
+- `"atama"`（あたまとり）: 次語の末尾が前語の先頭に一致
+- `"sugi"`（しりとりすぎ）: 前語の末尾と次語の先頭の**重なり長**（`overlapLen`、1文字以上）で接続し、重なり長を `points` で返す（＝得点）
 
-ルール設定は `{dictCheck, minLength, exactLength, limitSec}`（`limitSec:0`=制限なし）で、ソロは `ruleSnapshot()`、オンラインは `room.rule` に保持する。
+解答時間切れは judge 外（ソロはクライアントタイマー、オンラインは `online.timeoutLose()` の transaction）で敗北を確定する。新ルール追加時はこの契約を保つこと（online.jsの権威判定も同じ`judge()`を通すため自動で整合する）。
+
+ルール設定は `{mode, dictCheck, minLength, exactLength, limitSec, maxTurns}`（`mode:"normal"|"atama"|"sugi"`、`limitSec:0`=制限なし、`maxTurns`=しりとりすぎの最大手数）で、ソロは `ruleSnapshot()`、オンラインは `room.rule` に保持する。盤面の seal はモードで切替（通常「次」＋末尾字／あたまとり「末尾」＋先頭字／しりとりすぎ「重ね」＋末尾字）。しりとりすぎは連続数の代わりに得点行（`#score`）を表示し、ソロは最大ターン到達で `clear`（スコアアタック）、オンラインは席別 `room.scores`＋`turnCount` を集計し最大ターンで点数勝負（同点は `loser:null` 引き分け、`endReason:"turns"`）。
 
 ## Conventions
 
