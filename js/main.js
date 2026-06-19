@@ -195,8 +195,12 @@ function renderHistory() {
   list.forEach((g) => {
     const li = document.createElement("li");
     li.className = "history__item";
+    // オンライン対戦のみ自分視点の勝敗バッジを出す（ソロは相手不在のため出さない）
+    const badge = g.mode === "online"
+      ? `<span class="history__result history__result--${g.result === "win" ? "win" : "lose"}">${g.result === "win" ? "勝" : "敗"}</span>`
+      : "";
     li.innerHTML =
-      `<span class="history__meta">${g.date}・${g.length}語</span>` +
+      `<span class="history__meta">${badge}${g.date}・${g.length}語</span>` +
       `<span class="history__rule">${ruleSummary(g.rule)}</span>` +
       `<span class="history__words">${g.words.join(" → ")}</span>`;
     el.historyList.appendChild(li);
@@ -420,6 +424,11 @@ function renderOnline(room) {
   } else if (room.status === "over") {
     const iLost = room.loser === session.seat;
     const timeout = room.endReason === "timeout";
+    // 決着への遷移を1度だけ履歴保存（自分視点の勝敗・ローカル保存）
+    if (lastRoom && lastRoom.status !== "over") {
+      saveGame(room.words || words, iLost ? "lose" : "win", room.rule, "online");
+      renderHistory();
+    }
     el.roomStatus.textContent = iLost ? "敗北" : "勝利";
     setMessage(
       iLost ? (timeout ? "時間切れ…あなたの負け" : "あなたの負け…")
