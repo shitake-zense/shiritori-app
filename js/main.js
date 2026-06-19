@@ -24,6 +24,8 @@ const el = {
   lengthSelect: document.getElementById("lengthSelect"),
   sealLabel: document.getElementById("sealLabel"),
   score: document.getElementById("score"),
+  mastheadTitle: document.getElementById("mastheadTitle"),
+  mastheadSub: document.getElementById("mastheadSub"),
   timeToggle: document.getElementById("timeToggle"),
   limitWrap: document.getElementById("limitWrap"),
   limitInput: document.getElementById("limitInput"),
@@ -101,6 +103,18 @@ function modeLabel(rule) {
   return "";
 }
 
+/** 画面最上部の見出し・サブテキストを遊び方ごとに切り替える */
+const MASTHEAD = {
+  normal: { title: "しりとり", sub: "前の言葉の終わりから、次の言葉へ。" },
+  atama:  { title: "あたまとり", sub: "前の言葉の頭の文字で、終わる言葉へ。" },
+  sugi:   { title: "しりとりすぎ", sub: "重ねた文字数だけ、得点になる。" },
+};
+function applyMastheadMode(mode) {
+  const m = MASTHEAD[mode] || MASTHEAD.normal;
+  el.mastheadTitle.textContent = m.title;
+  el.mastheadSub.textContent = m.sub;
+}
+
 /** 盤面バッジ用の文字列（遊び方＋文字数しばりを結合） */
 function boardHint(rule) {
   const p = [];
@@ -170,10 +184,11 @@ function runTimer(deadline, limitMs, nowFn, onExpire) {
 }
 
 // ───────── 共通描画 ─────────
-function renderBoard(words, hint, mode = "normal") {
+function renderBoard(words, hint, mode = "normal", ended = false) {
   const prev = words[words.length - 1];
   const atama = mode === "atama";
   const sugi = mode === "sugi";
+  applyMastheadMode(mode);
   el.currentWord.textContent = prev ?? "―";
   // あたまとり: 次語は前語の「先頭文字」で終わる / しりとりすぎ: 末尾を重ねる / 通常: 末尾文字で始まる
   el.sealLabel.textContent = atama ? "末尾" : sugi ? "重ね" : "次";
@@ -181,7 +196,7 @@ function renderBoard(words, hint, mode = "normal") {
   renderRuleHint(hint);
   // しりとりすぎは連続数の代わりにスコア表示を使う（caller が描画）
   if (sugi) el.streak.hidden = true;
-  else renderStreak(words);
+  else renderStreak(words, ended);
   renderChain(words);
 }
 
@@ -201,11 +216,13 @@ function renderRuleHint(hint) {
   }
 }
 
-/** 連続成功回数（初期単語を除いてつないだ数）を表示 */
-function renderStreak(words) {
+/** 連続成功回数（初期単語を除いてつないだ数）を表示。ended時はリザルト文言にする */
+function renderStreak(words, ended = false) {
   const n = Math.max(0, words.length - 1);
   if (n > 0) {
-    el.streak.textContent = `連続 ${n} 回つながり中`;
+    el.streak.textContent = ended
+      ? `今回の記録：連続 ${n} 回つながった！`
+      : `連続 ${n} 回つながり中`;
     el.streak.hidden = false;
   } else {
     el.streak.hidden = true;
@@ -270,7 +287,7 @@ function newState() {
 }
 
 function renderSolo() {
-  renderBoard(state.words, boardHint(state.rule), state.rule.mode);
+  renderBoard(state.words, boardHint(state.rule), state.rule.mode, state.over);
   el.input.disabled = state.over;
   if (state.rule.mode === "sugi") {
     const cap = state.rule.maxTurns ? `／${state.rule.maxTurns}` : "";
@@ -294,6 +311,7 @@ function soloToSetup() {
   el.ruleHint.hidden = true;
   el.streak.hidden = true;
   renderScore(null);
+  applyMastheadMode(el.ruleMode.value); // 設定画面では選択中の遊び方を見出しに反映
   applyView();
   flash(el.rules, "view-in");
 }
@@ -457,7 +475,7 @@ function renderOnline(room) {
 
   const words = room.words && room.words.length ? room.words : [room.starter];
   const rule = room.rule || {};
-  renderBoard(words, boardHint(rule), rule.mode);
+  renderBoard(words, boardHint(rule), rule.mode, room.status === "over");
 
   // しりとりすぎ: 双方の得点とターン数を表示
   let mine = 0, theirs = 0;
@@ -615,6 +633,7 @@ async function onLeaveRoom() {
   el.ruleHint.hidden = true;
   el.streak.hidden = true;
   renderScore(null);
+  applyMastheadMode(el.ruleMode.value);
   applyView();                                 // 対戦画面 → ロビーへ遷移
   flash(el.lobby, "view-in");
 }
@@ -659,6 +678,7 @@ function setMode(next) {
     el.roomCodeInput.value = "";
     el.streak.hidden = true;
     renderScore(null);
+    applyMastheadMode(el.ruleMode.value);
     applyView();
     flash(el.lobby, "view-in");
     ensureConfigured();
@@ -683,6 +703,7 @@ el.limitInput.addEventListener("change", () => {
 });
 el.ruleMode.addEventListener("change", () => {
   el.turnsWrap.hidden = el.ruleMode.value !== "sugi"; // しりとりすぎ時のみ最大ターン入力
+  applyMastheadMode(el.ruleMode.value);               // 見出しも遊び方に追従
 });
 el.turnsInput.addEventListener("change", () => {
   el.turnsInput.value = String(ruleMaxTurns()); // 2〜99に丸めて表示も補正
