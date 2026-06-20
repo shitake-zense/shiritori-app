@@ -145,10 +145,26 @@ export async function joinRoom({ code, name } = {}) {
   await update(ref(db, `rooms/${code}/players/${playerId}`), {
     name: name || "ゲスト", seat: 1, online: true,
   });
-  // 対戦開始。先攻(seat0)の手番開始時刻をサーバ時刻で記録（タイムアウト基準）。
-  await update(roomRef, { status: "playing", turnStartedAt: serverTimestamp() });
+  // 参加しても自動では始めない（status="waiting"のまま）。
+  // ホストが startGame() を押して "playing" に遷移させる。
   setupPresence(code, playerId);
   return { code, playerId, seat: 1 };
+}
+
+/**
+ * ホストが対戦を開始する（waiting → playing）。
+ * 相手が未参加なら開始しない。先攻(seat0)の手番開始時刻をサーバ時刻で記録（タイムアウト基準）。
+ */
+export async function startGame(code) {
+  initOnline();
+  await runTransaction(ref(db, `rooms/${code}`), (room) => {
+    if (!room || room.status !== "waiting") return room;
+    const players = room.players || {};
+    if (Object.keys(players).length < 2) return room; // 相手が未参加 → 開始しない
+    room.status = "playing";
+    room.turnStartedAt = serverTimestamp();
+    return room;
+  });
 }
 
 /**
@@ -185,7 +201,7 @@ export async function submitWord({ code, seat }, word) {
     const used = new Set(words);
 
     const opts = {};
-    if (room.rule && room.rule.mode === "atama") opts.mode = "atama";
+    if (room.rule && (room.rule.mode === "atama" || room.rule.mode === "sugi")) opts.mode = room.rule.mode;
     if (room.rule && room.rule.dictCheck) opts.isRealWord = isRealWord;
     if (room.rule && room.rule.minLength > 2) opts.minLength = room.rule.minLength;
     if (room.rule && room.rule.exactLength) opts.exactLength = room.rule.exactLength;

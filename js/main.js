@@ -50,6 +50,7 @@ const el = {
   roomBanner: document.getElementById("roomBanner"),
   roomCode: document.getElementById("roomCode"),
   roomStatus: document.getElementById("roomStatus"),
+  startMatchBtn: document.getElementById("startMatchBtn"),
   leaveBtn: document.getElementById("leaveBtn"),
 };
 
@@ -500,13 +501,27 @@ function renderOnline(room) {
 
   const opponent = seatOf(room, 1 - session.seat);
   const seatLabel = session.seat === 0 ? "先攻" : "後攻";
+  const isHost = session.seat === 0;
+  el.startMatchBtn.hidden = true; // 既定で隠す（waitingのホストのみ後で開放）
 
   if (room.status === "waiting") {
-    el.roomStatus.textContent = "相手を待っています…";
-    setMessage(`コード「${session.code}」を相手に共有してね（あなたは${seatLabel}）`, "");
     stopTimer();
     el.actions.hidden = true;
     el.rematchBtn.hidden = true;
+    const opponentReady = opponent && opponent.online !== false;
+    if (opponentReady) {
+      // 相手が入室済み。即開始せず、ホストの「対戦をはじめる」で開始する。
+      el.roomStatus.textContent = isHost ? "相手が入室しました" : "ホストの開始を待っています…";
+      if (isHost) {
+        setMessage("相手が入室しました。準備ができたら「対戦をはじめる」を押してね", "");
+        el.startMatchBtn.hidden = false; // バナー内の開始ボタンを表示（ホストのみ）
+      } else {
+        setMessage("まもなく対戦が始まります…", "");
+      }
+    } else {
+      el.roomStatus.textContent = "相手を待っています…";
+      setMessage(`コード「${session.code}」を相手に共有してね（あなたは${seatLabel}）`, "");
+    }
   } else if (room.status === "playing") {
     const disconnected = opponent && opponent.online === false;
     el.roomStatus.textContent = disconnected
@@ -638,6 +653,19 @@ async function onLeaveRoom() {
   flash(el.lobby, "view-in");
 }
 
+async function onStartMatch() {
+  if (!session) return;
+  el.startMatchBtn.disabled = true;
+  try {
+    await online.startGame(session.code);
+    // 開始後は購読(renderOnline)が playing 画面へ遷移させる
+  } catch (e) {
+    setMessage("対戦の開始に失敗しました", "error");
+  } finally {
+    el.startMatchBtn.disabled = false;
+  }
+}
+
 async function onRematch() {
   if (!session) return;
   try {
@@ -720,6 +748,7 @@ el.modeOnline.addEventListener("click", () => setMode("online"));
 el.createRoomBtn.addEventListener("click", onCreateRoom);
 el.joinForm.addEventListener("submit", onJoinRoom);
 el.leaveBtn.addEventListener("click", onLeaveRoom);
+el.startMatchBtn.addEventListener("click", onStartMatch);
 el.rematchBtn.addEventListener("click", onRematch);
 window.addEventListener("beforeunload", () => {
   if (session) online.leaveRoom(session);
