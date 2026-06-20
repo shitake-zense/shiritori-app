@@ -43,6 +43,7 @@ https://shitake-zense.github.io/shiritori-app/
 - [x] **しりとりすぎ**（重なり加点）。前語の末尾と次語の先頭が重なる最大長で接続し、その文字数を得点化（例: りんご→ごりら→りらっくす→…→ぷーるさいど＝計11点）。`overlapLen()`＋`judge`の`points`。「ん」終了・被りは負け。最大ターン（`maxTurns`/`#turnsInput`、既定12）設定可。**ソロはスコアアタック**（最大ターン到達で`clear`・最終スコア表示）、**オンラインは席別`scores`＋`turnCount`を集計し最大ターンで点数勝負**（同点は引き分け`endReason:"turns"`/`loser:null`）。時間切れは点数に関係なく即負け。盤面sealは「重ね＋末尾字」、得点行`#score`を表示。履歴に得点併記＋勝/敗/分バッジ。
 
 ### 追加機能（実装済み）
+- [x] **文字数得点モード**（ON/OFFトグル・通常／あたまとり専用）。ONで答えた単語の文字数を得点化（`judge`の`opts.scoreByLength`→`points=word.length`）。ONにすると最大ターン入力（`turnsWrap`）が表示され、しりとりすぎと同じ得点制（スコア行＋ターン制）になる。ソロはスコアアタック、オンラインは席別`scores`で点数勝負。`scoringEnabled(rule)=mode==="sugi"||scoreByLength` で sugi 用の得点／ターン基盤を共通化。sugi選択時はトグル非表示（sugiは重なり得点を使う）。
 - [x] **解答時間制限**（案A=時間切れ即負け／入力は送信しない）。ソロ・オンライン両対応。**ON/OFFトグル（既定OFF）**、ONで解答時間を数値入力3〜100秒（既定10秒）。盤面にカウントダウンバー＋残秒（残り3秒で朱・点滅）
   - ソロ: クライアントタイマー。手番ごとに再起動、無効入力では継続
   - オンライン: `turnStartedAt`(サーバ時刻)＋`.info/serverTimeOffset`補正で期限を両者同期。超過は `online.timeoutLose()` の transaction で冪等決着（手番者=loser、`endReason:"timeout"`）。決着メッセージは時間切れ/通常を出し分け

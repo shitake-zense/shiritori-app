@@ -52,6 +52,7 @@ export function overlapLen(prevWord, word) {
  * @param {number} [opts.minLength] 指定時、この文字数以上の単語のみ許可（文字数しばり）
  * @param {number} [opts.exactLength] 指定時、ちょうどこの文字数の単語のみ許可（3文字縛り等）
  * @param {"normal"|"atama"|"sugi"} [opts.mode] 接続方向。"atama"=あたまとり（次語の末尾が前語の先頭に一致）／"sugi"=しりとりすぎ（末尾と先頭の重なり1文字以上で接続し、重なり長を points で返す）。既定は通常しりとり
+ * @param {boolean} [opts.scoreByLength] 指定時、答えた単語の文字数を得点(points)として返す（通常/あたまとり用の得点モード。sugiは重なり長が優先）
  * @returns {{ok:boolean, reason?:string, end?:"win"|"lose", points?:number}}
  */
 export function judge(word, prevWord, usedSet, opts = {}) {
@@ -93,5 +94,7 @@ export function judge(word, prevWord, usedSet, opts = {}) {
   if (endsWithN(word)) {
     return { ok: true, end: "lose", reason: `「ん」で終了！あなたの負け` };
   }
+  // 得点モード（通常/あたまとり）: 重なり得点がなければ文字数を得点にする
+  if (points == null && opts.scoreByLength) points = word.length;
   return points != null ? { ok: true, points } : { ok: true };
 }

@@ -3,7 +3,7 @@
 //
 // ルームのデータ構造（rooms/{code}）:
 //   status    : "waiting" | "playing" | "over"
-//   rule      : { mode: "normal"|"atama"|"sugi", dictCheck, minLength, exactLength, limitSec, maxTurns }
+//   rule      : { mode: "normal"|"atama"|"sugi", dictCheck, minLength, exactLength, limitSec, scoreByLength, maxTurns }
 //   starter   : string          初期単語
 //   words     : string[]        つないだ単語列（words[0] が starter）
 //   turn      : 0 | 1           次に打つ席(seat)
@@ -90,13 +90,17 @@ export async function createRoom({ name, rule } = {}) {
   const playerId = crypto.randomUUID();
   const starter = randomStarter();
   const m = rule && (rule.mode === "atama" || rule.mode === "sugi") ? rule.mode : "normal";
+  // 文字数得点モードは通常/あたまとり専用（sugiは重なり得点を使う）
+  const scoreByLength = !!(rule && rule.scoreByLength) && m !== "sugi";
   const safeRule = {
     mode: m, // 遊び方（normal/atama/sugi）
     dictCheck: !!(rule && rule.dictCheck),
     minLength: (rule && rule.minLength) || 2,
     exactLength: (rule && rule.exactLength) || 0,
     limitSec: rule && rule.limitSec ? clampLimit(rule.limitSec) : 0, // 0=制限なし
-    maxTurns: m === "sugi" ? clampTurns(rule && rule.maxTurns) : 0,   // しりとりすぎの最大ターン
+    scoreByLength,
+    // 得点制（しりとりすぎ or 文字数得点）の最大ターン
+    maxTurns: (m === "sugi" || scoreByLength) ? clampTurns(rule && rule.maxTurns) : 0,
   };
 
   for (let attempt = 0; attempt < 5; attempt++) {
@@ -202,6 +206,7 @@ export async function submitWord({ code, seat }, word) {
 
     const opts = {};
     if (room.rule && (room.rule.mode === "atama" || room.rule.mode === "sugi")) opts.mode = room.rule.mode;
+    if (room.rule && room.rule.scoreByLength) opts.scoreByLength = true;
     if (room.rule && room.rule.dictCheck) opts.isRealWord = isRealWord;
     if (room.rule && room.rule.minLength > 2) opts.minLength = room.rule.minLength;
     if (room.rule && room.rule.exactLength) opts.exactLength = room.rule.exactLength;
@@ -218,8 +223,8 @@ export async function submitWord({ code, seat }, word) {
       room.status = "over";
       room.loser = seat;
       room.endReason = "rule"; // 「ん」終了・重複（点数に関係なく即負け）
-    } else if (room.rule && room.rule.mode === "sugi") {
-      // しりとりすぎ: 重なり長を加点し、最大ターン到達で点数勝負
+    } else if (room.rule && (room.rule.mode === "sugi" || room.rule.scoreByLength)) {
+      // 得点制（しりとりすぎ＝重なり長 / 文字数得点＝文字数）を加点し、最大ターン到達で点数勝負
       const scores = room.scores || { 0: 0, 1: 0 };
       scores[seat] = (scores[seat] || 0) + (res.points || 0);
       room.scores = scores;
